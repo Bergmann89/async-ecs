@@ -1,0 +1,13 @@
+[package]
+name = "async-ecs"
+version = "0.1.0"
+authors = ["Bergmann89 <info@bergmann89.de>"]
+edition = "2018"
+
+[dependencies]
+async-ecs-derive = "0.1"
+env_logger = "0.8"
+log = "0.4"
+mopa = "0.2"
+rand = "0.7"
+thiserror = "1.0"
