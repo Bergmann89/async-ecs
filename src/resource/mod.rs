@@ -1,17 +1,19 @@
 pub mod cell;
+pub mod entry;
 
 use std::any::TypeId;
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
+use hashbrown::HashMap;
 use mopa::Any;
 
-use cell::{Ref as CellRef, RefMut as CellRefMut, TrustCell};
+use cell::{Cell, Ref as CellRef, RefMut as CellRefMut};
+use entry::Entry;
 
 #[derive(Default)]
 pub struct Resources {
-    resources: HashMap<ResourceId, TrustCell<Box<dyn Resource>>>,
+    resources: HashMap<ResourceId, Cell<Box<dyn Resource>>>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq)]
@@ -47,12 +49,19 @@ macro_rules! fetch_panic {
 /* Resources */
 
 impl Resources {
+    pub fn entry<R>(&mut self) -> Entry<R>
+    where
+        R: Resource,
+    {
+        Entry::new(self.resources.entry(ResourceId::new::<R>()))
+    }
+
     pub fn insert<R>(&mut self, r: R)
     where
         R: Resource,
     {
         self.resources
-            .insert(ResourceId::new::<R>(), TrustCell::new(Box::new(r)));
+            .insert(ResourceId::new::<R>(), Cell::new(Box::new(r)));
     }
 
     pub fn remove<R>(&mut self) -> Option<R>
@@ -61,7 +70,7 @@ impl Resources {
     {
         self.resources
             .remove(&ResourceId::new::<R>())
-            .map(TrustCell::into_inner)
+            .map(Cell::into_inner)
             .map(|x: Box<dyn Resource>| x.downcast())
             .map(|x: Result<Box<R>, _>| x.ok().unwrap())
             .map(|x| *x)
@@ -103,7 +112,7 @@ impl Resources {
         R: Resource,
     {
         self.resources.get(&ResourceId::new::<R>()).map(|r| RefMut {
-            inner: CellRefMut::map(r.borrow_mut(), Box::as_mut),
+            inner: r.borrow_mut().map(Box::as_mut),
             phantom: PhantomData,
         })
     }
@@ -116,7 +125,7 @@ impl Resources {
     pub fn get_resource_mut(&mut self, id: ResourceId) -> Option<&mut dyn Resource> {
         self.resources
             .get_mut(&id)
-            .map(TrustCell::get_mut)
+            .map(Cell::get_mut)
             .map(Box::as_mut)
     }
 }

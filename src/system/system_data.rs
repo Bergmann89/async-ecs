@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::resources::{ResourceId, Resources};
+use crate::resource::{ResourceId, Resources};
 
 use super::accessor::{Accessor, StaticAccessor};
 

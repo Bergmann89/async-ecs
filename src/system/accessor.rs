@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-use crate::resources::ResourceId;
+use crate::resource::ResourceId;
 
 use super::{DynamicSystemData, System, SystemData};
 

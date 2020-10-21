@@ -4,7 +4,7 @@ mod system_data;
 pub use accessor::{Accessor, AccessorCow};
 pub use system_data::{DynamicSystemData, SystemData};
 
-use crate::resources::Resources;
+use crate::resource::Resources;
 
 use accessor::AccessorType;
 

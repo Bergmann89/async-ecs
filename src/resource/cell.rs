@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug)]
-pub struct TrustCell<T> {
+pub struct Cell<T> {
     flag: AtomicUsize,
     inner: UnsafeCell<T>,
 }
@@ -37,11 +37,11 @@ macro_rules! borrow_panic {
     }};
 }
 
-/* TrustCell */
+/* Cell */
 
-impl<T> TrustCell<T> {
+impl<T> Cell<T> {
     pub fn new(inner: T) -> Self {
-        TrustCell {
+        Cell {
             flag: AtomicUsize::new(0),
             inner: UnsafeCell::new(inner),
         }
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn allow_multiple_reads() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let a = cell.borrow();
         let b = cell.borrow();
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn allow_clone_reads() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let a = cell.borrow();
         let b = a.clone();
@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn allow_single_write() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         {
             let mut a = cell.borrow_mut();
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "but it was already borrowed mutably")]
     fn panic_write_and_read() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let mut a = cell.borrow_mut();
         *a = 7;
@@ -281,7 +281,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "but it was already borrowed")]
     fn panic_write_and_write() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let mut a = cell.borrow_mut();
         *a = 7;
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "but it was already borrowed")]
     fn panic_read_and_write() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let _a = cell.borrow();
 
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn try_write_and_read() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let mut a = cell.try_borrow_mut().unwrap();
         *a = 7;
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn try_write_and_write() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let mut a = cell.try_borrow_mut().unwrap();
         *a = 7;
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn try_read_and_write() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let _a = cell.try_borrow().unwrap();
 
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn cloned_borrow_does_not_allow_write() {
-        let cell = TrustCell::new(5);
+        let cell = Cell::new(5);
 
         let a = cell.borrow();
         let b = a.clone();
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn ref_map_box() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         let r: Ref<'_, Box<usize>> = cell.borrow();
         assert_eq!(&**r, &10);
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn ref_map_preserves_flag() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         let r: Ref<'_, Box<usize>> = cell.borrow();
         assert_eq!(cell.flag.load(Ordering::SeqCst), 1);
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn ref_map_retains_borrow() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         let _r: Ref<'_, usize> = cell.borrow().map(Box::as_ref);
         assert_eq!(cell.flag.load(Ordering::SeqCst), 1);
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn ref_map_drops_borrow() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         let r: Ref<'_, usize> = cell.borrow().map(Box::as_ref);
 
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn ref_mut_map_box() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         {
             let mut r: RefMut<'_, Box<usize>> = cell.borrow_mut();
@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn ref_mut_map_preserves_flag() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         let r: RefMut<'_, Box<usize>> = cell.borrow_mut();
         assert_eq!(cell.flag.load(Ordering::SeqCst), std::usize::MAX);
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "but it was already borrowed")]
     fn ref_mut_map_retains_mut_borrow() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         let _rr: RefMut<'_, usize> = cell.borrow_mut().map(Box::as_mut);
 
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn ref_mut_map_drops_borrow() {
-        let cell = TrustCell::new(Box::new(10));
+        let cell = Cell::new(Box::new(10));
 
         let r: RefMut<'_, usize> = cell.borrow_mut().map(Box::as_mut);
 
