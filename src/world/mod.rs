@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 use crate::{
     access::{Read, ReadStorage, WriteStorage},
     component::Component,
-    entity::Entities,
+    entity::{Builder, Entities},
     resource::{Ref, RefMut, Resource, Resources},
     storage::MaskedStorage,
     system::SystemData,
@@ -58,6 +58,10 @@ impl World {
 
     pub fn component_mut<T: Component>(&self) -> WriteStorage<T> {
         WriteStorage::fetch(&self)
+    }
+
+    pub fn create_entity(&mut self) -> Builder {
+        Builder::new(self)
     }
 }
 

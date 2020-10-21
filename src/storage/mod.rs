@@ -6,6 +6,10 @@ pub use masked_storage::MaskedStorage;
 pub use storage_wrapper::StorageWrapper;
 pub use vec_storage::VecStorage;
 
-use crate::misc::TryDefault;
+use crate::{entity::Index, misc::TryDefault};
 
-pub trait Storage<T>: TryDefault {}
+pub trait Storage<T>: TryDefault {
+    fn get(&self, index: Index) -> &T;
+    fn get_mut(&mut self, index: Index) -> &mut T;
+    fn insert(&mut self, index: Index, value: T);
+}

@@ -33,9 +33,6 @@ where
         let inner = self.inner.or_insert_with(move || Cell::new(Box::new(f())));
         let inner = inner.borrow_mut().map(Box::as_mut);
 
-        RefMut {
-            inner,
-            phantom: PhantomData,
-        }
+        RefMut::new(inner)
     }
 }
