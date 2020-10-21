@@ -1,13 +1,13 @@
 use std::marker::PhantomData;
 
-use crate::resource::{ResourceId, Resources};
+use crate::{resource::ResourceId, world::World};
 
 use super::accessor::{Accessor, StaticAccessor};
 
 pub trait SystemData<'a> {
-    fn setup(resources: &mut Resources);
+    fn setup(world: &mut World);
 
-    fn fetch(resources: &'a Resources) -> Self;
+    fn fetch(world: &'a World) -> Self;
 
     fn reads() -> Vec<ResourceId>;
 
@@ -17,9 +17,9 @@ pub trait SystemData<'a> {
 pub trait DynamicSystemData<'a> {
     type Accessor: Accessor;
 
-    fn setup(accessor: &Self::Accessor, resources: &mut Resources);
+    fn setup(accessor: &Self::Accessor, world: &mut World);
 
-    fn fetch(access: &Self::Accessor, resources: &'a Resources) -> Self;
+    fn fetch(access: &Self::Accessor, world: &'a World) -> Self;
 }
 
 /* SystemData */
@@ -28,9 +28,9 @@ impl<'a, T> SystemData<'a> for PhantomData<T>
 where
     T: ?Sized,
 {
-    fn setup(_: &mut Resources) {}
+    fn setup(_: &mut World) {}
 
-    fn fetch(_: &Resources) -> Self {
+    fn fetch(_: &World) -> Self {
         PhantomData
     }
 
@@ -51,12 +51,12 @@ where
 {
     type Accessor = StaticAccessor<T>;
 
-    fn setup(_: &StaticAccessor<T>, resources: &mut Resources) {
-        T::setup(resources);
+    fn setup(_: &StaticAccessor<T>, world: &mut World) {
+        T::setup(world);
     }
 
-    fn fetch(_: &StaticAccessor<T>, resources: &'a Resources) -> Self {
-        T::fetch(resources)
+    fn fetch(_: &StaticAccessor<T>, world: &'a World) -> Self {
+        T::fetch(world)
     }
 }
 
@@ -68,18 +68,18 @@ mod impl_system_data {
             impl<'a, $($ty),*> SystemData<'a> for ( $( $ty , )* )
                 where $( $ty : SystemData<'a> ),*
                 {
-                    fn setup(resources: &mut Resources) {
+                    fn setup(world: &mut World) {
                         #![allow(unused_variables)]
 
                         $(
-                            <$ty as SystemData>::setup(&mut *resources);
+                            <$ty as SystemData>::setup(&mut *world);
                          )*
                     }
 
-                    fn fetch(resources: &'a Resources) -> Self {
+                    fn fetch(world: &'a World) -> Self {
                         #![allow(unused_variables)]
 
-                        ( $( <$ty as SystemData<'a>>::fetch(resources), )* )
+                        ( $( <$ty as SystemData<'a>>::fetch(world), )* )
                     }
 
                     fn reads() -> Vec<ResourceId> {

@@ -1,24 +1,63 @@
+mod setup;
+
+pub use setup::{DefaultSetupHandler, SetupHandler};
+
 use std::ops::{Deref, DerefMut};
 
-use crate::{component::Component, entity::Entities, resource::Resources, storage::MaskedStorage};
+use crate::{
+    access::{Read, ReadStorage, WriteStorage},
+    component::Component,
+    entity::Entities,
+    resource::{Ref, RefMut, Resource, Resources},
+    storage::MaskedStorage,
+    system::SystemData,
+};
 
 pub struct World(Resources);
 
 impl World {
-    pub fn register<T: Component>(&mut self)
+    pub fn register_component<T: Component>(&mut self)
     where
         T::Storage: Default,
     {
-        self.register_with_storage::<T, _>(Default::default);
+        self.register_component_with_storage::<T, _>(Default::default);
     }
 
-    pub fn register_with_storage<T, F>(&mut self, storage: F)
+    pub fn register_component_with_storage<T, F>(&mut self, storage: F)
     where
         T: Component,
         F: FnOnce() -> T::Storage,
     {
         self.entry()
             .or_insert_with(move || MaskedStorage::<T>::new(storage()));
+    }
+
+    pub fn register_resource<T: Resource>(&mut self, res: T) {
+        self.0.insert(res);
+    }
+
+    pub fn resource<T: Resource>(&self) -> Ref<T> {
+        self.0.borrow()
+    }
+
+    pub fn resource_mut<T: Resource>(&self) -> RefMut<T> {
+        self.0.borrow_mut()
+    }
+
+    pub fn entities(&self) -> Read<Entities> {
+        Read::fetch(&self)
+    }
+
+    pub fn entities_mut(&self) -> RefMut<Entities> {
+        self.resource_mut()
+    }
+
+    pub fn component<T: Component>(&self) -> ReadStorage<T> {
+        ReadStorage::fetch(&self)
+    }
+
+    pub fn component_mut<T: Component>(&self) -> WriteStorage<T> {
+        WriteStorage::fetch(&self)
     }
 }
 
