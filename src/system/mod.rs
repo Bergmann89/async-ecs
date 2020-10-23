@@ -1,12 +1,11 @@
-mod accessor;
 mod system_data;
 
-pub use accessor::{Accessor, AccessorCow};
 pub use system_data::{DynamicSystemData, SystemData};
 
-use crate::world::World;
-
-use accessor::AccessorType;
+use crate::{
+    access::{Accessor, AccessorCow, AccessorType},
+    world::World,
+};
 
 pub trait System<'a> {
     type SystemData: DynamicSystemData<'a>;

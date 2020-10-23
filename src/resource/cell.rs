@@ -121,6 +121,8 @@ impl<T> Cell<T> {
     }
 }
 
+unsafe impl<T> Sync for Cell<T> where T: Sync {}
+
 /* Ref */
 
 impl<'a, T> Ref<'a, T>

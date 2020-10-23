@@ -10,7 +10,7 @@ use mopa::Any;
 
 pub trait Resource: Any + Send + Sync + 'static {}
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ResourceId(TypeId);
 
 impl ResourceId {
@@ -19,5 +19,11 @@ impl ResourceId {
         R: Resource,
     {
         Self(TypeId::of::<R>())
+    }
+}
+
+impl From<TypeId> for ResourceId {
+    fn from(id: TypeId) -> Self {
+        Self(id)
     }
 }

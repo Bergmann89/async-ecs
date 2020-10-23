@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 
-use crate::{resource::ResourceId, world::World};
-
-use super::accessor::{Accessor, StaticAccessor};
+use crate::{
+    access::{Accessor, StaticAccessor},
+    resource::ResourceId,
+    world::World,
+};
 
 pub trait SystemData<'a> {
     fn setup(world: &mut World);
