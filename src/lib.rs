@@ -11,7 +11,7 @@ pub mod storage;
 pub mod system;
 pub mod world;
 
-pub use access::{ReadStorage, WriteStorage};
+pub use access::{Join, ReadStorage, WriteStorage};
 pub use dispatcher::Dispatcher;
 pub use resource::Resources;
 pub use storage::VecStorage;

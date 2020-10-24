@@ -11,13 +11,12 @@ pub async fn execute(
 ) {
     info!("System started: {}", &name);
 
-    run(&name, dispatchable, sender, receivers, world).await;
+    run(dispatchable, sender, receivers, world).await;
 
     info!("System finished: {}", &name);
 }
 
 async fn run(
-    name: &str,
     mut dispatchable: BoxedDispatchable,
     sender: Sender,
     mut receivers: Vec<Receiver>,
@@ -30,8 +29,6 @@ async fn run(
                 Err(_) => return,
             }
         }
-
-        info!("Run system: {}", &name);
 
         let world = world.borrow();
         let world = world.as_ref().unwrap();
