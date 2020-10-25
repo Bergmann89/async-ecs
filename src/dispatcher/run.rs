@@ -8,14 +8,16 @@ use crate::{
     world::World,
 };
 
-pub type BoxedFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
-pub type BoxedDispatchable = Box<dyn for<'a> Dispatchable<'a> + Send>;
+pub type ThreadRun = Box<dyn for<'a> Run<'a> + Send>;
+pub type LocalRun = Box<dyn for<'a> Run<'a>>;
 
-pub trait Dispatchable<'a> {
+pub type BoxedFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
+
+pub trait Run<'a> {
     fn run(&mut self, world: &'a World) -> BoxedFuture<'a>;
 }
 
-impl<'a, T> Dispatchable<'a> for T
+impl<'a, T> Run<'a> for T
 where
     T: AsyncSystem<'a>,
     <T as AsyncSystem<'a>>::Future: Send,

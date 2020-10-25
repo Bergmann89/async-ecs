@@ -1,11 +1,17 @@
 use std::collections::hash_map::{Entry, HashMap};
 use std::fmt::Debug;
 
-use tokio::{spawn, sync::watch::channel};
+use tokio::{
+    sync::watch::channel,
+    task::{spawn as spawn_thread, spawn_local},
+};
 
 use crate::{access::Accessor, resource::ResourceId, system::AsyncSystem};
 
-use super::{task::execute, BoxedDispatchable, Dispatcher, Error, Receiver, Sender, SharedWorld};
+use super::{
+    task::{execute_local, execute_thread},
+    Dispatcher, Error, LocalRun, Receiver, Sender, SharedWorld, ThreadRun,
+};
 
 pub struct Builder {
     next_id: SystemId,
@@ -15,7 +21,7 @@ pub struct Builder {
 
 struct Item {
     name: String,
-    system: BoxedDispatchable,
+    run: RunType,
 
     sender: Sender,
     receiver: Receiver,
@@ -24,6 +30,11 @@ struct Item {
     reads: Vec<ResourceId>,
     writes: Vec<ResourceId>,
     dependencies: Vec<SystemId>,
+}
+
+enum RunType {
+    Thread(ThreadRun),
+    Local(LocalRun),
 }
 
 #[derive(Default, Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -41,16 +52,23 @@ impl Builder {
         let (sender, receiver) = channel(());
 
         for (_, item) in self.items.into_iter() {
+            let run = item.run;
             let name = item.name;
             let sender = item.sender;
-            let system = item.system;
             let receivers = if item.dependencies.is_empty() {
                 vec![receiver.clone()]
             } else {
                 item.receivers
             };
 
-            spawn(execute(name, system, sender, receivers, world.clone()));
+            match run {
+                RunType::Thread(run) => {
+                    spawn_thread(execute_thread(name, run, sender, receivers, world.clone()))
+                }
+                RunType::Local(run) => {
+                    spawn_local(execute_local(name, run, sender, receivers, world.clone()))
+                }
+            };
         }
 
         Dispatcher {
@@ -78,15 +96,74 @@ impl Builder {
     where
         S: for<'s> AsyncSystem<'s> + Send + 'static,
     {
+        self.add_inner(
+            name,
+            dependencies,
+            system.accessor().reads(),
+            system.accessor().writes(),
+            |this, id| match this.items.entry(id) {
+                Entry::Vacant(e) => e.insert(Item::thread(name.into(), system)),
+                Entry::Occupied(_) => panic!("Item was already created!"),
+            },
+        )?;
+
+        Ok(self)
+    }
+
+    pub fn with_local<S>(
+        mut self,
+        system: S,
+        name: &str,
+        dependencies: &[&str],
+    ) -> Result<Self, Error>
+    where
+        S: for<'s> AsyncSystem<'s> + 'static,
+    {
+        self.add_local(system, name, dependencies)?;
+
+        Ok(self)
+    }
+
+    pub fn add_local<S>(
+        &mut self,
+        system: S,
+        name: &str,
+        dependencies: &[&str],
+    ) -> Result<&mut Self, Error>
+    where
+        S: for<'s> AsyncSystem<'s> + 'static,
+    {
+        self.add_inner(
+            name,
+            dependencies,
+            system.accessor().reads(),
+            system.accessor().writes(),
+            |this, id| match this.items.entry(id) {
+                Entry::Vacant(e) => e.insert(Item::local(name.into(), system)),
+                Entry::Occupied(_) => panic!("Item was already created!"),
+            },
+        )?;
+
+        Ok(self)
+    }
+
+    fn add_inner<F>(
+        &mut self,
+        name: &str,
+        dependencies: &[&str],
+        mut reads: Vec<ResourceId>,
+        mut writes: Vec<ResourceId>,
+        f: F,
+    ) -> Result<&mut Self, Error>
+    where
+        F: FnOnce(&mut Self, SystemId) -> &mut Item,
+    {
         let name = name.to_owned();
         let id = self.next_id();
-        let id = match self.names.entry(name.clone()) {
+        let id = match self.names.entry(name) {
             Entry::Vacant(e) => Ok(*e.insert(id)),
             Entry::Occupied(e) => Err(Error::NameAlreadyRegistered(e.key().into())),
         }?;
-
-        let mut reads = system.accessor().reads();
-        let mut writes = system.accessor().writes();
 
         reads.sort();
         writes.sort();
@@ -127,10 +204,7 @@ impl Builder {
             .map(|id| self.items.get(id).unwrap().receiver.clone())
             .collect();
 
-        let item = match self.items.entry(id) {
-            Entry::Vacant(e) => e.insert(Item::new(name, system)),
-            Entry::Occupied(_) => panic!("Item was already created!"),
-        };
+        let item = f(self, id);
 
         item.reads = reads;
         item.writes = writes;
@@ -206,15 +280,12 @@ impl Default for Builder {
 }
 
 impl Item {
-    fn new<S>(name: String, system: S) -> Self
-    where
-        S: for<'s> AsyncSystem<'s> + Send + 'static,
-    {
+    fn new(name: String, run: RunType) -> Self {
         let (sender, receiver) = channel(());
 
         Self {
             name,
-            system: Box::new(system),
+            run,
 
             sender,
             receiver,
@@ -224,6 +295,20 @@ impl Item {
             writes: Vec::new(),
             dependencies: Vec::new(),
         }
+    }
+
+    fn thread<S>(name: String, system: S) -> Self
+    where
+        S: for<'s> AsyncSystem<'s> + Send + 'static,
+    {
+        Self::new(name, RunType::Thread(Box::new(system)))
+    }
+
+    fn local<S>(name: String, system: S) -> Self
+    where
+        S: for<'s> AsyncSystem<'s> + 'static,
+    {
+        Self::new(name, RunType::Local(Box::new(system)))
     }
 }
 

@@ -1,11 +1,11 @@
 pub mod builder;
-pub mod dispatchable;
 pub mod error;
+pub mod run;
 pub mod task;
 
 pub use builder::Builder;
-pub use dispatchable::{BoxedDispatchable, Dispatchable};
 pub use error::Error;
+pub use run::{LocalRun, Run, ThreadRun};
 
 use std::cell::RefCell;
 use std::ops::Deref;

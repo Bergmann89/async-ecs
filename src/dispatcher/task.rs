@@ -1,23 +1,37 @@
 use log::info;
 
-use super::{BoxedDispatchable, Receiver, Sender, SharedWorld};
+use super::{LocalRun, Receiver, Run, Sender, SharedWorld, ThreadRun};
 
-pub async fn execute(
+pub async fn execute_thread(
     name: String,
-    dispatchable: BoxedDispatchable,
+    mut run: ThreadRun,
     sender: Sender,
     receivers: Vec<Receiver>,
     world: SharedWorld,
 ) {
     info!("System started: {}", &name);
 
-    run(dispatchable, sender, receivers, world).await;
+    execute_inner(run.as_mut(), sender, receivers, world).await;
 
     info!("System finished: {}", &name);
 }
 
-async fn run(
-    mut dispatchable: BoxedDispatchable,
+pub async fn execute_local(
+    name: String,
+    mut run: LocalRun,
+    sender: Sender,
+    receivers: Vec<Receiver>,
+    world: SharedWorld,
+) {
+    info!("System started (local): {}", &name);
+
+    execute_inner(run.as_mut(), sender, receivers, world).await;
+
+    info!("System finished (local): {}", &name);
+}
+
+async fn execute_inner<R: for<'a> Run<'a> + ?Sized>(
+    run: &mut R,
     sender: Sender,
     mut receivers: Vec<Receiver>,
     world: SharedWorld,
@@ -33,7 +47,7 @@ async fn run(
         let world = world.borrow();
         let world = world.as_ref().unwrap();
 
-        dispatchable.run(world);
+        run.run(world);
 
         match sender.send(()) {
             Ok(()) => (),

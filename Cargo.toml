@@ -9,7 +9,7 @@ async-ecs-derive = "0.1"
 env_logger = "0.8"
 futures = "0.3"
 hashbrown = "0.9"
-hibitset = "0.6"
+hibitset = { version = "0.6", default-features = false }
 log = "0.4"
 mopa = "0.2"
 rand = "0.7"
