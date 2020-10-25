@@ -24,6 +24,10 @@ pub trait DynamicSystemData<'a> {
     fn fetch(access: &Self::Accessor, world: &'a World) -> Self;
 }
 
+pub trait WithSystemData<'a> {
+    type SystemData: DynamicSystemData<'a>;
+}
+
 /* SystemData */
 
 impl<'a, T> SystemData<'a> for PhantomData<T>

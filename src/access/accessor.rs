@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use crate::{
     resource::ResourceId,
-    system::{DynamicSystemData, System, SystemData},
+    system::{DynamicSystemData, SystemData, WithSystemData},
 };
 
 pub trait Accessor: Sized {
@@ -28,14 +28,15 @@ pub struct StaticAccessor<T> {
 pub enum AccessorCow<'a, 'b, T>
 where
     AccessorType<'a, T>: 'b,
-    T: System<'a> + ?Sized,
+    T: WithSystemData<'a> + ?Sized,
     'a: 'b,
 {
     Borrow(&'b AccessorType<'a, T>),
     Owned(AccessorType<'a, T>),
 }
 
-pub type AccessorType<'a, T> = <<T as System<'a>>::SystemData as DynamicSystemData<'a>>::Accessor;
+pub type AccessorType<'a, T> =
+    <<T as WithSystemData<'a>>::SystemData as DynamicSystemData<'a>>::Accessor;
 
 /* StaticAccessor */
 
@@ -63,7 +64,7 @@ where
 impl<'a, 'b, T> Deref for AccessorCow<'a, 'b, T>
 where
     AccessorType<'a, T>: 'b,
-    T: System<'a> + ?Sized + 'b,
+    T: WithSystemData<'a> + ?Sized + 'b,
     'a: 'b,
 {
     type Target = AccessorType<'a, T>;

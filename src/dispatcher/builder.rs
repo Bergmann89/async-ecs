@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use tokio::{spawn, sync::watch::channel};
 
-use crate::{access::Accessor, resource::ResourceId, system::System};
+use crate::{access::Accessor, resource::ResourceId, system::AsyncSystem};
 
 use super::{task::execute, BoxedDispatchable, Dispatcher, Error, Receiver, Sender, SharedWorld};
 
@@ -62,7 +62,7 @@ impl Builder {
 
     pub fn with<S>(mut self, system: S, name: &str, dependencies: &[&str]) -> Result<Self, Error>
     where
-        S: for<'s> System<'s> + Send + 'static,
+        S: for<'s> AsyncSystem<'s> + Send + 'static,
     {
         self.add(system, name, dependencies)?;
 
@@ -76,7 +76,7 @@ impl Builder {
         dependencies: &[&str],
     ) -> Result<&mut Self, Error>
     where
-        S: for<'s> System<'s> + Send + 'static,
+        S: for<'s> AsyncSystem<'s> + Send + 'static,
     {
         let name = name.to_owned();
         let id = self.next_id();
@@ -208,7 +208,7 @@ impl Default for Builder {
 impl Item {
     fn new<S>(name: String, system: S) -> Self
     where
-        S: for<'s> System<'s> + Send + 'static,
+        S: for<'s> AsyncSystem<'s> + Send + 'static,
     {
         let (sender, receiver) = channel(());
 
@@ -231,7 +231,11 @@ impl Item {
 mod tests {
     use super::*;
 
-    use crate::{access::AccessorCow, system::DynamicSystemData, world::World};
+    use crate::{
+        access::AccessorCow,
+        system::{DynamicSystemData, System},
+        world::World,
+    };
 
     #[test]
     fn dependencies_on_read_and_write() {
