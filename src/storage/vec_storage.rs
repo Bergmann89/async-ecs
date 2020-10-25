@@ -2,7 +2,7 @@ use std::mem::MaybeUninit;
 
 use crate::entity::Index;
 
-use super::Storage;
+use super::{DistinctStorage, Storage};
 
 pub struct VecStorage<T>(Vec<MaybeUninit<T>>);
 
@@ -33,6 +33,8 @@ impl<T> Storage<T> for VecStorage<T> {
         }
     }
 }
+
+impl<T> DistinctStorage for VecStorage<T> {}
 
 impl<T> Default for VecStorage<T> {
     fn default() -> Self {

@@ -20,6 +20,7 @@ macro_rules! split_impl (
         impl<$($a,)* $($b,)*> Split for ($($a,)* $($b,)*) {
             type Left = ($($a,)*);
             type Right = ($($b,)*);
+
             #[allow(non_snake_case)]
             fn split(self) -> (Self::Left, Self::Right) {
                 match self {
@@ -27,9 +28,11 @@ macro_rules! split_impl (
                 }
             }
         }
+
         impl<$($a,)* $($b,)* TLast> Split for ($($a,)* $($b,)* TLast,) {
             type Left = ($($a,)*);
             type Right = ($($b,)* TLast,);
+
             #[allow(non_snake_case)]
             fn split(self) -> (Self::Left, Self::Right) {
                 match self {

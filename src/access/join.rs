@@ -9,7 +9,9 @@ use crate::{
     resource::{Ref, RefMut, Resource},
 };
 
-use super::{read::Read, write::Write};
+use super::{read::Read, write::Write, ParJoin};
+
+/* Join */
 
 pub trait Join {
     type Type;
@@ -40,6 +42,8 @@ pub trait Join {
     }
 }
 
+/* MaybeJoin */
+
 pub struct MaybeJoin<J: Join>(pub J);
 
 impl<T> Join for MaybeJoin<T>
@@ -68,6 +72,12 @@ where
         true
     }
 }
+
+/* ParJoin */
+
+impl<T> ParJoin for MaybeJoin<T> where T: ParJoin {}
+
+/* JoinIter */
 
 pub struct JoinIter<J: Join> {
     keys: BitIter<J::Mask>,
@@ -143,7 +153,7 @@ macro_rules! define_tuple_join {
 
             #[allow(non_snake_case)]
             fn get(v: &mut Self::Value, i: Index) -> Self::Type {
-                let &mut ($(ref mut $from,)*) = v;
+                let ($(ref mut $from,)*) = v;
 
                 ($($from::get($from, i),)*)
             }
@@ -157,6 +167,11 @@ macro_rules! define_tuple_join {
                 unconstrained
             }
         }
+
+        impl<$($from,)*> ParJoin for ($($from),*,)
+            where $($from: ParJoin),*,
+                  ($(<$from as Join>::Mask,)*): BitAnd,
+        {}
     }
 }
 
@@ -201,6 +216,13 @@ macro_rules! define_mutable_join {
                 <&'a mut T as Join>::is_unconstrained()
             }
         }
+
+        impl<'a, 'b, T> ParJoin for &'a mut $ty
+        where
+            &'a mut T: ParJoin,
+            T: Resource,
+        {
+        }
     };
 }
 
@@ -230,6 +252,13 @@ macro_rules! define_immutable_join {
             fn is_unconstrained() -> bool {
                 <&'a T as Join>::is_unconstrained()
             }
+        }
+
+        impl<'a, 'b, T> ParJoin for &'a $ty
+        where
+            &'a T: ParJoin,
+            T: Resource,
+        {
         }
     };
 }

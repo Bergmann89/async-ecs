@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Not};
 
-use hibitset::{BitSet, BitSetNot};
+use hibitset::BitSet;
 
 use crate::{
-    access::Join,
+    access::{Join, ParJoin},
     component::Component,
     entity::{Entities, Entity, Index},
     error::Error,
@@ -12,15 +12,13 @@ use crate::{
     storage::MaskedStorage,
 };
 
-use super::Storage;
+use super::{AntiStorage, DistinctStorage, Storage};
 
 pub struct StorageWrapper<'a, T, D> {
     data: D,
     entities: Ref<'a, Entities>,
     phantom: PhantomData<T>,
 }
-
-pub struct AntiStorage<'a>(pub &'a BitSet);
 
 impl<'a, T, D> StorageWrapper<'a, T, D> {
     pub fn new(data: D, entities: Ref<'a, Entities>) -> Self {
@@ -46,8 +44,13 @@ where
     }
 
     pub fn not(&self) -> AntiStorage<'_> {
-        AntiStorage(&self.data.mask)
+        AntiStorage(&self.data.mask())
     }
+}
+
+impl<'a, T: Component, D> DistinctStorage for StorageWrapper<'a, T, D> where
+    T::Storage: DistinctStorage
+{
 }
 
 impl<'a, 'e, T, D> Not for &'a StorageWrapper<'e, T, D>
@@ -58,7 +61,7 @@ where
     type Output = AntiStorage<'a>;
 
     fn not(self) -> Self::Output {
-        AntiStorage(&self.data.mask)
+        AntiStorage(&self.data.mask())
     }
 }
 
@@ -72,11 +75,11 @@ where
     type Value = &'a T::Storage;
 
     fn open(self) -> (Self::Mask, Self::Value) {
-        (&self.data.mask, &self.data.inner)
+        (self.data.mask(), self.data.storage())
     }
 
     fn get(v: &mut Self::Value, i: Index) -> &'a T {
-        v.get(i)
+        (**v).get(i)
     }
 }
 
@@ -87,28 +90,33 @@ where
 {
     type Mask = &'a BitSet;
     type Type = &'a mut T;
-    type Value = &'a mut T::Storage;
+    type Value = &'a T::Storage;
 
     fn open(self) -> (Self::Mask, Self::Value) {
-        self.data.open_mut()
+        (self.data.mask(), self.data.storage())
     }
 
     fn get(v: &mut Self::Value, i: Index) -> &'a mut T {
-        // HACK
-        let value: *mut Self::Value = v as *mut Self::Value;
+        unsafe {
+            let value: *mut T::Storage = *v as *const T::Storage as *mut T::Storage;
 
-        unsafe { (*value).get_mut(i) }
+            (*value).get_mut(i)
+        }
     }
 }
 
-impl<'a> Join for AntiStorage<'a> {
-    type Mask = BitSetNot<&'a BitSet>;
-    type Type = ();
-    type Value = ();
+impl<'a, 'e, T, D> ParJoin for &'a StorageWrapper<'e, T, D>
+where
+    T: Component,
+    D: Deref<Target = MaskedStorage<T>>,
+    T::Storage: Sync,
+{
+}
 
-    fn open(self) -> (Self::Mask, ()) {
-        (BitSetNot(self.0), ())
-    }
-
-    fn get(_: &mut (), _: Index) {}
+impl<'a, 'e, T, D> ParJoin for &'a mut StorageWrapper<'e, T, D>
+where
+    T: Component,
+    D: DerefMut<Target = MaskedStorage<T>>,
+    T::Storage: Sync + DistinctStorage,
+{
 }

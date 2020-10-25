@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use tokio::{
     sync::watch::channel,
-    task::{spawn as spawn_thread, spawn_local},
+    task::{spawn as spawn_task, spawn_local},
 };
 
 use crate::{access::Accessor, resource::ResourceId, system::AsyncSystem};
@@ -63,7 +63,7 @@ impl Builder {
 
             match run {
                 RunType::Thread(run) => {
-                    spawn_thread(execute_thread(name, run, sender, receivers, world.clone()))
+                    spawn_task(execute_thread(name, run, sender, receivers, world.clone()))
                 }
                 RunType::Local(run) => {
                     spawn_local(execute_local(name, run, sender, receivers, world.clone()))
@@ -237,7 +237,7 @@ impl Builder {
             }
         }
 
-        remove_indices.sort();
+        remove_indices.sort_unstable();
         remove_indices.dedup();
         remove_indices.reverse();
 

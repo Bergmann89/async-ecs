@@ -5,8 +5,8 @@ use hibitset::BitSet;
 use crate::{component::Component, entity::Entity, storage::Storage};
 
 pub struct MaskedStorage<T: Component> {
-    pub(crate) mask: BitSet,
-    pub(crate) inner: T::Storage,
+    mask: BitSet,
+    inner: T::Storage,
 }
 
 impl<T: Component> MaskedStorage<T> {
@@ -17,8 +17,12 @@ impl<T: Component> MaskedStorage<T> {
         }
     }
 
-    pub fn open_mut(&mut self) -> (&BitSet, &mut T::Storage) {
-        (&self.mask, &mut self.inner)
+    pub fn mask(&self) -> &BitSet {
+        &self.mask
+    }
+
+    pub fn storage(&self) -> &T::Storage {
+        &self.inner
     }
 
     pub fn insert(&mut self, entity: Entity, mut component: T) -> Option<T> {

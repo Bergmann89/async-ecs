@@ -1,6 +1,57 @@
-use hibitset::{BitSetAnd, BitSetLike};
+use hibitset::{BitSetLike, DrainableBitSet};
 
-use crate::misc::Split;
+use crate::{entity::Index, misc::Split};
+
+/* BitSetAnd */
+
+#[derive(Debug, Clone, Copy)]
+pub struct BitSetAnd<A: BitSetLike, B: BitSetLike>(pub A, pub B);
+
+impl<A, B> BitSetLike for BitSetAnd<A, B>
+where
+    A: BitSetLike,
+    B: BitSetLike,
+{
+    #[inline]
+    fn layer3(&self) -> usize {
+        self.0.layer3() & self.1.layer3()
+    }
+    #[inline]
+    fn layer2(&self, i: usize) -> usize {
+        self.0.layer2(i) & self.1.layer2(i)
+    }
+    #[inline]
+    fn layer1(&self, i: usize) -> usize {
+        self.0.layer1(i) & self.1.layer1(i)
+    }
+    #[inline]
+    fn layer0(&self, i: usize) -> usize {
+        self.0.layer0(i) & self.1.layer0(i)
+    }
+    #[inline]
+    fn contains(&self, i: Index) -> bool {
+        self.0.contains(i) && self.1.contains(i)
+    }
+}
+
+impl<A, B> DrainableBitSet for BitSetAnd<A, B>
+where
+    A: DrainableBitSet,
+    B: DrainableBitSet,
+{
+    #[inline]
+    fn remove(&mut self, i: Index) -> bool {
+        if self.contains(i) {
+            self.0.remove(i);
+            self.1.remove(i);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/* BitAnd */
 
 pub trait BitAnd {
     type Value: BitSetLike;

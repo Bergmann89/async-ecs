@@ -114,10 +114,7 @@ impl<T> Cell<T> {
     }
 
     fn check_flag_write(&self) -> bool {
-        match self.flag.compare_and_swap(0, usize::MAX, Ordering::AcqRel) {
-            0 => true,
-            _ => false,
-        }
+        self.flag.compare_and_swap(0, usize::MAX, Ordering::AcqRel) == 0
     }
 }
 

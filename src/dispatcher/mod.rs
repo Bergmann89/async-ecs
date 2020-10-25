@@ -7,9 +7,10 @@ pub use builder::Builder;
 pub use error::Error;
 pub use run::{LocalRun, Run, ThreadRun};
 
-use std::cell::RefCell;
+use std::ptr::null;
 use std::ops::Deref;
 use std::sync::Arc;
+use std::cell::RefCell;
 
 use tokio::sync::watch::{Receiver as WatchReceiver, Sender as WatchSender};
 
@@ -21,8 +22,10 @@ pub struct Dispatcher {
     world: SharedWorld,
 }
 
-#[derive(Clone, Default)]
-pub struct SharedWorld(Arc<RefCell<Option<World>>>);
+#[derive(Clone)]
+pub struct SharedWorld(Arc<RefCell<* const World>>);
+
+struct WorldGuard<'a>(&'a mut SharedWorld);
 
 type Sender = WatchSender<()>;
 type Receiver = WatchReceiver<()>;
@@ -32,8 +35,8 @@ impl Dispatcher {
         Builder::default()
     }
 
-    pub async fn dispatch(&mut self, world: World) -> Result<World, Error> {
-        *self.world.borrow_mut() = Some(world);
+    pub async fn dispatch(&mut self, world: &World) -> Result<(), Error> {
+        let _guard = self.world.set(world);
 
         match self.sender.send(()) {
             Ok(()) => (),
@@ -47,17 +50,47 @@ impl Dispatcher {
             }
         }
 
-        Ok(self.world.borrow_mut().take().unwrap())
+        Ok(())
     }
 }
 
-impl Deref for SharedWorld {
-    type Target = RefCell<Option<World>>;
+impl SharedWorld {
+    fn set(&mut self, world: &World) -> WorldGuard {
+        *self.0.borrow_mut() = world as * const _;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+        WorldGuard(self)
+    }
+
+    fn clear(&mut self) {
+        *self.0.borrow_mut() = null();
     }
 }
 
 unsafe impl Send for SharedWorld {}
 unsafe impl Sync for SharedWorld {}
+
+impl Default for SharedWorld {
+    fn default() -> Self {
+        Self(Arc::new(RefCell::new(null())))
+    }
+}
+
+impl Deref for SharedWorld {
+    type Target = World;
+
+    fn deref(&self) -> &Self::Target {
+        let world = self.0.borrow();
+
+        if world.is_null() {
+            panic!("No World assigned!");
+        }
+
+        unsafe { &**world }
+    }
+}
+
+impl Drop for WorldGuard<'_> {
+    fn drop(&mut self) {
+        self.0.clear()
+    }
+}

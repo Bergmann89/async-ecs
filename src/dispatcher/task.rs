@@ -44,10 +44,7 @@ async fn execute_inner<R: for<'a> Run<'a> + ?Sized>(
             }
         }
 
-        let world = world.borrow();
-        let world = world.as_ref().unwrap();
-
-        run.run(world);
+        run.run(&world).await;
 
         match sender.send(()) {
             Ok(()) => (),
