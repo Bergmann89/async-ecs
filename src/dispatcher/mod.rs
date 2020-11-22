@@ -7,10 +7,10 @@ pub use builder::Builder;
 pub use error::Error;
 pub use run::{LocalRun, Run, ThreadRun};
 
-use std::ptr::null;
-use std::ops::Deref;
-use std::sync::Arc;
 use std::cell::RefCell;
+use std::ops::Deref;
+use std::ptr::null;
+use std::sync::Arc;
 
 use tokio::sync::watch::{Receiver as WatchReceiver, Sender as WatchSender};
 
@@ -23,7 +23,7 @@ pub struct Dispatcher {
 }
 
 #[derive(Clone)]
-pub struct SharedWorld(Arc<RefCell<* const World>>);
+pub struct SharedWorld(Arc<RefCell<*const World>>);
 
 struct WorldGuard<'a>(&'a mut SharedWorld);
 
@@ -56,7 +56,7 @@ impl Dispatcher {
 
 impl SharedWorld {
     fn set(&mut self, world: &World) -> WorldGuard {
-        *self.0.borrow_mut() = world as * const _;
+        *self.0.borrow_mut() = world as *const _;
 
         WorldGuard(self)
     }

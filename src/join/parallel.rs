@@ -6,26 +6,15 @@ use crate::misc::{BitIter, BitProducer};
 
 use super::Join;
 
-/* ParJoin */
-
-pub trait ParJoin: Join {
-    fn par_join(self) -> JoinParIter<Self>
-    where
-        Self: Sized,
-    {
-        if <Self as Join>::is_unconstrained() {
-            log::warn!(
-                "`ParJoin` possibly iterating through all indices, you might've made a join with all `MaybeJoin`s, which is unbounded in length."
-            );
-        }
-
-        JoinParIter(self)
-    }
-}
-
 /* JoinParIter */
 
 pub struct JoinParIter<J>(J);
+
+impl<J> JoinParIter<J> {
+    pub fn new(inner: J) -> Self {
+        Self(inner)
+    }
+}
 
 impl<'a, J> ParallelIterator<'a> for JoinParIter<J>
 where

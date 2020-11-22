@@ -1,8 +1,8 @@
 use hibitset::{BitSet, BitSetNot};
 
 use crate::{
-    access::{Join, ParJoin},
     entity::Index,
+    join::{Join, ParJoin},
 };
 
 use super::DistinctStorage;

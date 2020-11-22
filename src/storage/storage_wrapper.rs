@@ -4,10 +4,10 @@ use std::ops::{Deref, DerefMut, Not};
 use hibitset::BitSet;
 
 use crate::{
-    access::{Join, ParJoin},
     component::Component,
     entity::{Entities, Entity, Index},
     error::Error,
+    join::{Join, ParJoin},
     resource::Ref,
     storage::MaskedStorage,
 };

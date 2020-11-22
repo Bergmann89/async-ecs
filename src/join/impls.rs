@@ -1,134 +1,13 @@
 use std::ops::{Deref, DerefMut};
 
-use hibitset::{BitIter, BitSetAll, BitSetLike};
-use log::warn;
-
 use crate::{
-    entity::{Entities, Entity, Index},
+    access::{read::Read, write::Write},
+    entity::Index,
     misc::BitAnd,
     resource::{Ref, RefMut, Resource},
 };
 
-use super::{read::Read, write::Write, ParJoin};
-
-/* Join */
-
-pub trait Join {
-    type Type;
-    type Value;
-    type Mask: BitSetLike;
-
-    fn open(self) -> (Self::Mask, Self::Value);
-
-    fn get(value: &mut Self::Value, index: Index) -> Self::Type;
-
-    fn join(self) -> JoinIter<Self>
-    where
-        Self: Sized,
-    {
-        JoinIter::new(self)
-    }
-
-    fn maybe(self) -> MaybeJoin<Self>
-    where
-        Self: Sized,
-    {
-        MaybeJoin(self)
-    }
-
-    #[inline]
-    fn is_unconstrained() -> bool {
-        false
-    }
-}
-
-/* MaybeJoin */
-
-pub struct MaybeJoin<J: Join>(pub J);
-
-impl<T> Join for MaybeJoin<T>
-where
-    T: Join,
-{
-    type Mask = BitSetAll;
-    type Type = Option<<T as Join>::Type>;
-    type Value = (<T as Join>::Mask, <T as Join>::Value);
-
-    fn open(self) -> (Self::Mask, Self::Value) {
-        let (mask, value) = self.0.open();
-
-        (BitSetAll, (mask, value))
-    }
-
-    fn get((mask, value): &mut Self::Value, index: Index) -> Self::Type {
-        if mask.contains(index) {
-            Some(<T as Join>::get(value, index))
-        } else {
-            None
-        }
-    }
-
-    fn is_unconstrained() -> bool {
-        true
-    }
-}
-
-/* ParJoin */
-
-impl<T> ParJoin for MaybeJoin<T> where T: ParJoin {}
-
-/* JoinIter */
-
-pub struct JoinIter<J: Join> {
-    keys: BitIter<J::Mask>,
-    values: J::Value,
-}
-
-impl<J: Join> JoinIter<J> {
-    pub fn new(j: J) -> Self {
-        if <J as Join>::is_unconstrained() {
-            warn!(
-                "`Join` possibly iterating through all indices, you might've made a join with all `MaybeJoin`s, which is unbounded in length."
-            );
-        }
-
-        let (keys, values) = j.open();
-
-        JoinIter {
-            keys: keys.iter(),
-            values,
-        }
-    }
-
-    pub fn get(&mut self, entity: Entity, entities: &Entities) -> Option<J::Type> {
-        if self.keys.contains(entity.index()) && entities.is_alive(entity) {
-            Some(J::get(&mut self.values, entity.index()))
-        } else {
-            None
-        }
-    }
-}
-
-impl<J: Join> std::iter::Iterator for JoinIter<J> {
-    type Item = J::Type;
-
-    fn next(&mut self) -> Option<J::Type> {
-        self.keys.next().map(|idx| J::get(&mut self.values, idx))
-    }
-}
-
-impl<J: Join> Clone for JoinIter<J>
-where
-    J::Mask: Clone,
-    J::Value: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            keys: self.keys.clone(),
-            values: self.values.clone(),
-        }
-    }
-}
+use super::{Join, ParJoin};
 
 macro_rules! define_tuple_join {
     ($($from:ident),*) => {
