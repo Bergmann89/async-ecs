@@ -3,30 +3,6 @@ use std::mem::forget;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[derive(Debug)]
-pub struct Cell<T> {
-    flag: AtomicUsize,
-    inner: UnsafeCell<T>,
-}
-
-#[derive(Debug)]
-pub struct Ref<'a, T>
-where
-    T: ?Sized + 'a,
-{
-    flag: &'a AtomicUsize,
-    value: &'a T,
-}
-
-#[derive(Debug)]
-pub struct RefMut<'a, T>
-where
-    T: ?Sized + 'a,
-{
-    flag: &'a AtomicUsize,
-    value: &'a mut T,
-}
-
 macro_rules! borrow_panic {
     ($s:expr) => {{
         panic!(
@@ -37,9 +13,15 @@ macro_rules! borrow_panic {
     }};
 }
 
-/* Cell */
+/// A custom cell container that is a `RefCell` with thread-safety.
+#[derive(Debug)]
+pub struct Cell<T> {
+    flag: AtomicUsize,
+    inner: UnsafeCell<T>,
+}
 
 impl<T> Cell<T> {
+    /// Create a new cell, similar to `RefCell::new`
     pub fn new(inner: T) -> Self {
         Cell {
             flag: AtomicUsize::new(0),
@@ -47,10 +29,19 @@ impl<T> Cell<T> {
         }
     }
 
+    /// Consumes this cell and returns ownership of `T`.
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }
 
+    /// Get an immutable reference to the inner data.
+    ///
+    /// Absence of write accesses is checked at run-time.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if there is a mutable reference to the data
+    /// already in use.
     pub fn borrow(&self) -> Ref<T> {
         if !self.check_flag_read() {
             borrow_panic!(" mutably");
@@ -62,6 +53,10 @@ impl<T> Cell<T> {
         }
     }
 
+    /// Get an immutable reference to the inner data.
+    ///
+    /// Absence of write accesses is checked at run-time. If access is not
+    /// possible, an error is returned.
     pub fn try_borrow(&self) -> Option<Ref<T>> {
         if self.check_flag_read() {
             Some(Ref {
@@ -73,6 +68,14 @@ impl<T> Cell<T> {
         }
     }
 
+    /// Get a mutable reference to the inner data.
+    ///
+    /// Exclusive access is checked at run-time.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if there are any references to the data already
+    /// in use.
     pub fn borrow_mut(&self) -> RefMut<T> {
         if !self.check_flag_write() {
             borrow_panic!("");
@@ -84,6 +87,10 @@ impl<T> Cell<T> {
         }
     }
 
+    /// Get a mutable reference to the inner data.
+    ///
+    /// Exclusive access is checked at run-time. If access is not possible, an
+    /// error is returned.
     pub fn try_borrow_mut(&self) -> Option<RefMut<T>> {
         if self.check_flag_write() {
             Some(RefMut {
@@ -95,10 +102,15 @@ impl<T> Cell<T> {
         }
     }
 
+    /// Gets exclusive access to the inner value, bypassing the Cell.
+    ///
+    /// Exclusive access is checked at compile time.
     pub fn get_mut(&mut self) -> &mut T {
         unsafe { &mut *self.inner.get() }
     }
 
+    /// Make sure we are allowed to aquire a read lock, and increment the read
+    /// count by 1
     fn check_flag_read(&self) -> bool {
         loop {
             let val = self.flag.load(Ordering::Acquire);
@@ -113,6 +125,8 @@ impl<T> Cell<T> {
         }
     }
 
+    /// Make sure we are allowed to aquire a write lock, and then set the write
+    /// lock flag.
     fn check_flag_write(&self) -> bool {
         self.flag.compare_and_swap(0, usize::MAX, Ordering::AcqRel) == 0
     }
@@ -120,12 +134,64 @@ impl<T> Cell<T> {
 
 unsafe impl<T> Sync for Cell<T> where T: Sync {}
 
-/* Ref */
+/// An immutable reference to data in a `Cell`.
+///
+/// Access the value via `std::ops::Deref` (e.g. `*val`)
+#[derive(Debug)]
+pub struct Ref<'a, T>
+where
+    T: ?Sized + 'a,
+{
+    flag: &'a AtomicUsize,
+    value: &'a T,
+}
 
 impl<'a, T> Ref<'a, T>
 where
     T: ?Sized,
 {
+    /// Makes a new `Ref` for a component of the borrowed data which preserves
+    /// the existing borrow.
+    ///
+    /// The `Cell` is already immutably borrowed, so this cannot fail.
+    ///
+    /// This is an associated function that needs to be used as `Ref::map(...)`.
+    /// A method would interfere with methods of the same name on the contents
+    /// of a `Ref` used through `Deref`. Further this preserves the borrow of
+    /// the value and hence does the proper cleanup when it's dropped.
+    ///
+    /// # Examples
+    ///
+    /// This can be used to avoid pointer indirection when a boxed item is
+    /// stored in the `Cell`.
+    ///
+    /// ```
+    /// use async_ecs::resource::cell::*;
+    ///
+    /// let cb = Cell::new(Box::new(5));
+    ///
+    /// // Borrowing the cell causes the `Ref` to store a reference to the `Box`, which is a
+    /// // pointer to the value on the heap, not the actual value.
+    /// let boxed_ref: Ref<'_, Box<usize>> = cb.borrow();
+    /// assert_eq!(**boxed_ref, 5); // Notice the double deref to get the actual value.
+    ///
+    /// // By using `map` we can let `Ref` store a reference directly to the value on the heap.
+    /// let pure_ref: Ref<'_, usize> = Ref::map(boxed_ref, Box::as_ref);
+    ///
+    /// assert_eq!(*pure_ref, 5);
+    /// ```
+    ///
+    /// We can also use `map` to get a reference to a sub-part of the borrowed
+    /// value.
+    ///
+    /// ```rust
+    /// # use async_ecs::resource::cell::*;
+    ///
+    /// let c = Cell::new((5, 'b'));
+    /// let b1: Ref<'_, (u32, char)> = c.borrow();
+    /// let b2: Ref<'_, u32> = Ref::map(b1, |t| &t.0);
+    /// assert_eq!(*b2, 5);
+    /// ```
     pub fn map<U, F>(self, f: F) -> Ref<'a, U>
     where
         F: FnOnce(&T) -> &U,
@@ -177,12 +243,66 @@ where
     }
 }
 
-/* RefMut */
+/// A mutable reference to data in a `Cell`.
+///
+/// Access the value via `std::ops::DerefMut` (e.g. `*val`)
+#[derive(Debug)]
+pub struct RefMut<'a, T>
+where
+    T: ?Sized + 'a,
+{
+    flag: &'a AtomicUsize,
+    value: &'a mut T,
+}
 
 impl<'a, T> RefMut<'a, T>
 where
     T: ?Sized,
 {
+    /// Makes a new `RefMut` for a component of the borrowed data which
+    /// preserves the existing borrow.
+    ///
+    /// The `Cell` is already mutably borrowed, so this cannot fail.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `RefMut::map(...)`. A method would interfere with methods of the
+    /// same name on the contents of a `RefMut` used through `DerefMut`.
+    /// Further this preserves the borrow of the value and hence does the
+    /// proper cleanup when it's dropped.
+    ///
+    /// # Examples
+    ///
+    /// This can also be used to avoid pointer indirection when a boxed item is
+    /// stored in the `Cell`.
+    ///
+    /// ```
+    /// use async_ecs::resource::cell::*;
+    ///
+    /// let cb = Cell::new(Box::new(5));
+    ///
+    /// // Borrowing the cell causes the `RefMut` to store a reference to the `Box`, which is a
+    /// // pointer to the value on the heap, and not a reference directly to the value.
+    /// let boxed_ref: RefMut<'_, Box<usize>> = cb.borrow_mut();
+    /// assert_eq!(**boxed_ref, 5); // Notice the double deref to get the actual value.
+    ///
+    /// // By using `map` we can let `RefMut` store a reference directly to the value on the heap.
+    /// let pure_ref: RefMut<'_, usize> = RefMut::map(boxed_ref, Box::as_mut);
+    ///
+    /// assert_eq!(*pure_ref, 5);
+    /// ```
+    ///
+    /// We can also use `map` to get a reference to a sub-part of the borrowed
+    /// value.
+    ///
+    /// ```rust
+    /// # use async_ecs::resource::cell::*;
+    ///
+    /// let c = Cell::new((5, 'b'));
+    ///
+    /// let b1: RefMut<'_, (u32, char)> = c.borrow_mut();
+    /// let b2: RefMut<'_, u32> = RefMut::map(b1, |t| &mut t.0);
+    /// assert_eq!(*b2, 5);
+    /// ```
     pub fn map<U, F>(self, f: F) -> RefMut<'a, U>
     where
         F: FnOnce(&mut T) -> &mut U,
@@ -289,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "but it was already borrowed")]
+    #[should_panic(expected = "Tried to fetch data of type \"i32\", but it was already borrowed.")]
     fn panic_read_and_write() {
         let cell = Cell::new(5);
 
@@ -467,7 +587,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "but it was already borrowed")]
+    #[should_panic(
+        expected = "Tried to fetch data of type \"alloc::boxed::Box<usize>\", but it was already borrowed."
+    )]
     fn ref_mut_map_retains_mut_borrow() {
         let cell = Cell::new(Box::new(10));
 

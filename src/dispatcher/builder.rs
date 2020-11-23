@@ -6,41 +6,134 @@ use tokio::{
     task::{spawn as spawn_task, spawn_local},
 };
 
-use crate::{access::Accessor, resource::ResourceId, system::AsyncSystem};
-
-use super::{
-    task::{execute_local, execute_thread},
-    Dispatcher, Error, LocalRun, Receiver, Sender, SharedWorld, ThreadRun,
+use crate::{
+    access::Accessor,
+    resource::ResourceId,
+    system::{AsyncSystem, System},
+    world::World,
 };
 
-pub struct Builder {
+use super::{
+    task::{execute_local, execute_local_async, execute_thread, execute_thread_async},
+    Dispatcher, Error, LocalRun, LocalRunAsync, Receiver, Sender, SharedWorld, ThreadRun,
+    ThreadRunAsync,
+};
+
+/// Id of a system inside the `Dispatcher` and the `Builder`.
+#[derive(Default, Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct SystemId(pub usize);
+
+/// Builder for the [`Dispatcher`].
+///
+/// [`Dispatcher`]: struct.Dispatcher.html
+///
+/// ## Barriers
+///
+/// Barriers are a way of sequentializing parts of
+/// the system execution. See `add_barrier()`/`with_barrier()`.
+///
+/// ## Examples
+///
+/// This is how you create a dispatcher with
+/// a shared thread pool:
+///
+/// ```rust
+/// # #![allow(unused)]
+/// #
+/// # use async_ecs::*;
+/// #
+/// # #[derive(Debug, Default)]
+/// # struct Res;
+/// #
+/// # #[derive(SystemData)]
+/// # struct Data<'a> { a: Read<'a, Res> }
+/// #
+/// # struct Dummy;
+/// #
+/// # impl<'a> System<'a> for Dummy {
+/// #   type SystemData = Data<'a>;
+/// #
+/// #   fn run(&mut self, _: Data<'a>) {}
+/// # }
+/// #
+/// # #[tokio::main]
+/// # async fn main() {
+/// # let system_a = Dummy;
+/// # let system_b = Dummy;
+/// # let system_c = Dummy;
+/// # let system_d = Dummy;
+/// # let system_e = Dummy;
+/// #
+/// let dispatcher = Dispatcher::builder()
+///     .with(system_a, "a", &[])
+///     .unwrap()
+///     .with(system_b, "b", &["a"])
+///     .unwrap() // b depends on a
+///     .with(system_c, "c", &["a"])
+///     .unwrap() // c also depends on a
+///     .with(system_d, "d", &[])
+///     .unwrap()
+///     .with(system_e, "e", &["c", "d"])
+///     .unwrap() // e executes after c and d are finished
+///     .build();
+/// # }
+/// ```
+///
+/// Systems can be conditionally added by using the `add_` functions:
+///
+/// ```rust
+/// # #![allow(unused)]
+/// #
+/// # use async_ecs::*;
+/// #
+/// # #[derive(Debug, Default)]
+/// # struct Res;
+/// #
+/// # #[derive(SystemData)]
+/// # struct Data<'a> { a: Read<'a, Res> }
+/// #
+/// # struct Dummy;
+/// #
+/// # impl<'a> System<'a> for Dummy {
+/// #   type SystemData = Data<'a>;
+/// #
+/// #   fn run(&mut self, _: Data<'a>) {}
+/// # }
+/// #
+/// # #[tokio::main]
+/// # async fn main() {
+/// # let b_enabled = true;
+/// # let system_a = Dummy;
+/// # let system_b = Dummy;
+/// let mut builder = Dispatcher::builder().with(system_a, "a", &[]).unwrap();
+///
+/// if b_enabled {
+///     builder.add(system_b, "b", &[]).unwrap();
+/// }
+///
+/// let dispatcher = builder.build();
+/// # }
+/// ```
+pub struct Builder<'a> {
+    world: Option<&'a mut World>,
     next_id: SystemId,
     items: HashMap<SystemId, Item>,
     names: HashMap<String, SystemId>,
 }
 
-struct Item {
-    name: String,
-    run: RunType,
+impl<'a> Builder<'a> {
+    pub fn new(world: Option<&'a mut World>) -> Self {
+        Self {
+            world,
+            next_id: Default::default(),
+            items: Default::default(),
+            names: Default::default(),
+        }
+    }
 
-    sender: Sender,
-    receiver: Receiver,
-    receivers: Vec<Receiver>,
-
-    reads: Vec<ResourceId>,
-    writes: Vec<ResourceId>,
-    dependencies: Vec<SystemId>,
-}
-
-enum RunType {
-    Thread(ThreadRun),
-    Local(LocalRun),
-}
-
-#[derive(Default, Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct SystemId(pub usize);
-
-impl Builder {
+    /// Builds the `Dispatcher`.
+    ///
+    /// This method will precompute useful information in order to speed up dispatching.
     pub fn build(self) -> Dispatcher {
         let receivers = self
             .final_systems()
@@ -68,6 +161,20 @@ impl Builder {
                 RunType::Local(run) => {
                     spawn_local(execute_local(name, run, sender, receivers, world.clone()))
                 }
+                RunType::ThreadAsync(run) => spawn_task(execute_thread_async(
+                    name,
+                    run,
+                    sender,
+                    receivers,
+                    world.clone(),
+                )),
+                RunType::LocalAsync(run) => spawn_local(execute_local_async(
+                    name,
+                    run,
+                    sender,
+                    receivers,
+                    world.clone(),
+                )),
             };
         }
 
@@ -78,18 +185,95 @@ impl Builder {
         }
     }
 
+    /// Adds a new system with a given name and a list of dependencies.
+    /// Please note that the dependency should be added before
+    /// you add the depending system.
+    ///
+    /// If you want to register systems which can not be specified as
+    /// dependencies, you can use `""` as their name, which will not panic
+    /// (using another name twice will).
+    ///
+    /// Same as [`add()`](struct.Dispatcher::builder().html#method.add), but
+    /// returns `self` to enable method chaining.
     pub fn with<S>(mut self, system: S, name: &str, dependencies: &[&str]) -> Result<Self, Error>
     where
-        S: for<'s> AsyncSystem<'s> + Send + 'static,
+        S: for<'s> System<'s> + Send + 'static,
     {
         self.add(system, name, dependencies)?;
 
         Ok(self)
     }
 
+    /// Adds a new system with a given name and a list of dependencies.
+    /// Please note that the dependency should be added before
+    /// you add the depending system.
+    ///
+    /// If you want to register systems which can not be specified as
+    /// dependencies, you can use `""` as their name, which will not panic
+    /// (using another name twice will).
     pub fn add<S>(
         &mut self,
+        mut system: S,
+        name: &str,
+        dependencies: &[&str],
+    ) -> Result<&mut Self, Error>
+    where
+        S: for<'s> System<'s> + Send + 'static,
+    {
+        self.add_inner(
+            name,
+            dependencies,
+            system.accessor().reads(),
+            system.accessor().writes(),
+            |this, id| {
+                if let Some(ref mut w) = this.world {
+                    system.setup(w)
+                }
+
+                match this.items.entry(id) {
+                    Entry::Vacant(e) => e.insert(Item::thread(name.into(), system)),
+                    Entry::Occupied(_) => panic!("Item was already created!"),
+                }
+            },
+        )?;
+
+        Ok(self)
+    }
+
+    /// Adds a new asynchronous system with a given name and a list of dependencies.
+    /// Please note that the dependency should be added before
+    /// you add the depending system.
+    ///
+    /// If you want to register systems which can not be specified as
+    /// dependencies, you can use `""` as their name, which will not panic
+    /// (using another name twice will).
+    ///
+    /// Same as [`add()`](struct.Dispatcher::builder().html#method.add), but
+    /// returns `self` to enable method chaining.
+    pub fn with_async<S>(
+        mut self,
         system: S,
+        name: &str,
+        dependencies: &[&str],
+    ) -> Result<Self, Error>
+    where
+        S: for<'s> AsyncSystem<'s> + Send + 'static,
+    {
+        self.add_async(system, name, dependencies)?;
+
+        Ok(self)
+    }
+
+    /// Adds a new asynchronous system with a given name and a list of dependencies.
+    /// Please note that the dependency should be added before
+    /// you add the depending system.
+    ///
+    /// If you want to register systems which can not be specified as
+    /// dependencies, you can use `""` as their name, which will not panic
+    /// (using another name twice will).
+    pub fn add_async<S>(
+        &mut self,
+        mut system: S,
         name: &str,
         dependencies: &[&str],
     ) -> Result<&mut Self, Error>
@@ -101,16 +285,86 @@ impl Builder {
             dependencies,
             system.accessor().reads(),
             system.accessor().writes(),
-            |this, id| match this.items.entry(id) {
-                Entry::Vacant(e) => e.insert(Item::thread(name.into(), system)),
-                Entry::Occupied(_) => panic!("Item was already created!"),
+            |this, id| {
+                if let Some(ref mut w) = this.world {
+                    system.setup(w)
+                }
+
+                match this.items.entry(id) {
+                    Entry::Vacant(e) => e.insert(Item::thread_async(name.into(), system)),
+                    Entry::Occupied(_) => panic!("Item was already created!"),
+                }
             },
         )?;
 
         Ok(self)
     }
 
+    /// Adds a new thread local system.
+    ///
+    /// Please only use this if your struct is not `Send` and `Sync`.
+    ///
+    /// Thread-local systems are dispatched in-order.
+    ///
+    /// Same as [Dispatcher::builder()::add_local], but returns `self` to
+    /// enable method chaining.
     pub fn with_local<S>(
+        mut self,
+        system: S,
+        name: &str,
+        dependencies: &[&str],
+    ) -> Result<Self, Error>
+    where
+        S: for<'s> System<'s> + 'static,
+    {
+        self.add_local(system, name, dependencies)?;
+
+        Ok(self)
+    }
+
+    /// Adds a new thread local system.
+    ///
+    /// Please only use this if your struct is not `Send` and `Sync`.
+    ///
+    /// Thread-local systems are dispatched in-order.
+    pub fn add_local<S>(
+        &mut self,
+        mut system: S,
+        name: &str,
+        dependencies: &[&str],
+    ) -> Result<&mut Self, Error>
+    where
+        S: for<'s> System<'s> + 'static,
+    {
+        self.add_inner(
+            name,
+            dependencies,
+            system.accessor().reads(),
+            system.accessor().writes(),
+            |this, id| {
+                if let Some(ref mut w) = this.world {
+                    system.setup(w)
+                }
+
+                match this.items.entry(id) {
+                    Entry::Vacant(e) => e.insert(Item::local(name.into(), system)),
+                    Entry::Occupied(_) => panic!("Item was already created!"),
+                }
+            },
+        )?;
+
+        Ok(self)
+    }
+
+    /// Adds a new thread local asynchronous system.
+    ///
+    /// Please only use this if your struct is not `Send` and `Sync`.
+    ///
+    /// Thread-local systems are dispatched in-order.
+    ///
+    /// Same as [Dispatcher::builder()::add_local], but returns `self` to
+    /// enable method chaining.
+    pub fn with_local_async<S>(
         mut self,
         system: S,
         name: &str,
@@ -119,14 +373,19 @@ impl Builder {
     where
         S: for<'s> AsyncSystem<'s> + 'static,
     {
-        self.add_local(system, name, dependencies)?;
+        self.add_local_async(system, name, dependencies)?;
 
         Ok(self)
     }
 
-    pub fn add_local<S>(
+    /// Adds a new thread local asynchronous system.
+    ///
+    /// Please only use this if your struct is not `Send` and `Sync`.
+    ///
+    /// Thread-local systems are dispatched in-order.
+    pub fn add_local_async<S>(
         &mut self,
-        system: S,
+        mut system: S,
         name: &str,
         dependencies: &[&str],
     ) -> Result<&mut Self, Error>
@@ -138,9 +397,15 @@ impl Builder {
             dependencies,
             system.accessor().reads(),
             system.accessor().writes(),
-            |this, id| match this.items.entry(id) {
-                Entry::Vacant(e) => e.insert(Item::local(name.into(), system)),
-                Entry::Occupied(_) => panic!("Item was already created!"),
+            |this, id| {
+                if let Some(ref mut w) = this.world {
+                    system.setup(w)
+                }
+
+                match this.items.entry(id) {
+                    Entry::Vacant(e) => e.insert(Item::local_async(name.into(), system)),
+                    Entry::Occupied(_) => panic!("Item was already created!"),
+                }
             },
         )?;
 
@@ -269,14 +534,26 @@ impl Builder {
     }
 }
 
-impl Default for Builder {
-    fn default() -> Self {
-        Self {
-            next_id: SystemId(0),
-            items: HashMap::new(),
-            names: HashMap::new(),
-        }
-    }
+/// Defines how to execute the `System` with the `Dispatcher`.
+enum RunType {
+    Thread(ThreadRun),
+    Local(LocalRun),
+    ThreadAsync(ThreadRunAsync),
+    LocalAsync(LocalRunAsync),
+}
+
+/// Item that wraps all information of a 'System` within the `Builder`.
+struct Item {
+    name: String,
+    run: RunType,
+
+    sender: Sender,
+    receiver: Receiver,
+    receivers: Vec<Receiver>,
+
+    reads: Vec<ResourceId>,
+    writes: Vec<ResourceId>,
+    dependencies: Vec<SystemId>,
 }
 
 impl Item {
@@ -299,16 +576,30 @@ impl Item {
 
     fn thread<S>(name: String, system: S) -> Self
     where
-        S: for<'s> AsyncSystem<'s> + Send + 'static,
+        S: for<'s> System<'s> + Send + 'static,
     {
         Self::new(name, RunType::Thread(Box::new(system)))
     }
 
     fn local<S>(name: String, system: S) -> Self
     where
-        S: for<'s> AsyncSystem<'s> + 'static,
+        S: for<'s> System<'s> + 'static,
     {
         Self::new(name, RunType::Local(Box::new(system)))
+    }
+
+    fn thread_async<S>(name: String, system: S) -> Self
+    where
+        S: for<'s> AsyncSystem<'s> + Send + 'static,
+    {
+        Self::new(name, RunType::ThreadAsync(Box::new(system)))
+    }
+
+    fn local_async<S>(name: String, system: S) -> Self
+    where
+        S: for<'s> AsyncSystem<'s> + 'static,
+    {
+        Self::new(name, RunType::LocalAsync(Box::new(system)))
     }
 }
 
@@ -431,7 +722,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn accessor<'b>(&'b self) -> AccessorCow<'a, 'b, Self> {
+        fn accessor<'b>(&'b self) -> AccessorCow<'a, 'b, Self::SystemData> {
             AccessorCow::Borrow(&self.accessor)
         }
     }

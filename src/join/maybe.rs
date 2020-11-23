@@ -4,6 +4,17 @@ use crate::entity::Index;
 
 use super::{Join, ParJoin};
 
+/// A `Join`-able structure that yields all indices, returning `None` for all
+/// missing elements and `Some(T)` for found elements.
+///
+/// For usage see [`Join::maybe()`].
+///
+/// WARNING: Do not have a join of only `MaybeJoin`s. Otherwise the join will
+/// iterate over every single index of the bitset. If you want a join with
+/// all `MaybeJoin`s, add an `Entities` to the join as well to bound the
+/// join to all entities that are alive.
+///
+/// [`Join::maybe()`]: trait.Join.html#method.maybe
 pub struct MaybeJoin<J: Join>(pub J);
 
 impl<T> Join for MaybeJoin<T>

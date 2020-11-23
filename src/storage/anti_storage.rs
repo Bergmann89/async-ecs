@@ -7,6 +7,8 @@ use crate::{
 
 use super::DistinctStorage;
 
+/// An inverted storage type, only useful to iterate entities
+/// that do not have a particular component type.
 pub struct AntiStorage<'a>(pub &'a BitSet);
 
 impl<'a> DistinctStorage for AntiStorage<'a> {}

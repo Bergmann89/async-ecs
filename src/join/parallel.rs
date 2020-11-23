@@ -8,6 +8,7 @@ use super::Join;
 
 /* JoinParIter */
 
+/// `JoinParIter` is a `ParallelIterator` over a group of `Storages`.
 pub struct JoinParIter<J>(J);
 
 impl<J> JoinParIter<J> {

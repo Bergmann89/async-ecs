@@ -4,9 +4,22 @@ use std::ops::{Deref, DerefMut};
 use crate::{
     resource::{RefMut, Resource, ResourceId},
     system::SystemData,
-    world::{DefaultSetupHandler, SetupHandler, World},
+    world::{DefaultSetupHandler, PanicHandler, SetupHandler, World},
 };
 
+/// Allows to fetch a resource in a system mutably.
+/// **This will panic if the resource does not exist.**
+/// Usage of `Write` or `Option<Write>` is therefore recommended.
+pub type WriteExpect<'a, T> = Write<'a, T, PanicHandler>;
+
+/// Allows to fetch a resource in a system mutably.
+///
+/// If the resource isn't strictly required, you should use `Option<Write<T>>`.
+///
+/// # Type parameters
+///
+/// * `T`: The type of the resource
+/// * `F`: The setup handler (default: `DefaultProvider`)
 pub struct Write<'a, T: 'a, F = DefaultSetupHandler> {
     inner: RefMut<'a, T>,
     marker: PhantomData<F>,

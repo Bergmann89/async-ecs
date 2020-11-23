@@ -16,3 +16,17 @@ where
         world.entry().or_insert_with(T::default);
     }
 }
+
+/// A setup handler that simply does nothing and thus will cause a panic on
+/// fetching.
+///
+/// A typedef called `ReadExpect` exists, so you usually don't use this type
+/// directly.
+pub struct PanicHandler;
+
+impl<T> SetupHandler<T> for PanicHandler
+where
+    T: Resource,
+{
+    fn setup(_: &mut World) {}
+}

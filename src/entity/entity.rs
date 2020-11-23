@@ -2,12 +2,17 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 
+/// `Entity` type, as seen by the user.
 #[derive(Clone, Copy)]
 pub struct Entity(EntityRaw);
 
+/// Index of the entity.
 pub type Index = u32;
+
+/// Generation of the entity.
 pub type Generation = u32;
 
+/// Raw data of the entity.
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
 union EntityRaw {
@@ -23,26 +28,31 @@ struct EntityData {
 }
 
 impl Entity {
+    /// Create new entity with the given ID.
     pub fn from_id(id: u64) -> Self {
         Self(EntityRaw { id })
     }
 
+    /// Create new entity with the given given index and generation.
     pub fn from_parts(index: Index, generation: Generation) -> Self {
         Self(EntityRaw {
             data: EntityData { index, generation },
         })
     }
 
+    /// Get the id of the entity.
     #[inline]
     pub fn id(&self) -> u64 {
         unsafe { self.0.id }
     }
 
+    /// Get the index of the entity.
     #[inline]
     pub fn index(&self) -> Index {
         unsafe { self.0.data.index }
     }
 
+    // Get the generation of the entity.
     #[inline]
     pub fn generation(&self) -> Generation {
         unsafe { self.0.data.generation }

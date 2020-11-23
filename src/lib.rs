@@ -14,10 +14,22 @@ pub mod world;
 
 pub use asparit;
 
-pub use access::{ReadStorage, WriteStorage};
+pub use access::{Read, ReadStorage, Write, WriteStorage};
+pub use component::Component;
 pub use dispatcher::Dispatcher;
 pub use join::{Join, ParJoin};
-pub use resource::Resources;
-pub use storage::VecStorage;
+pub use resource::{ResourceId, Resources};
+pub use storage::{DenseVecStorage, HashMapStorage, VecStorage};
 pub use system::{AsyncSystem, System};
 pub use world::World;
+
+pub type Entities<'a> = Read<'a, entity::Entities>;
+
+#[macro_use]
+#[allow(unused_imports)]
+#[cfg(feature = "derive")]
+extern crate async_ecs_derive;
+
+#[doc(hidden)]
+#[cfg(feature = "derive")]
+pub use async_ecs_derive::*;

@@ -7,6 +7,7 @@ use crate::entity::{Entities, Entity};
 
 use super::Join;
 
+/// `JoinIter` is an `Iterator` over a group of `Storages`.
 pub struct JoinIter<J: Join> {
     keys: BitIter<J::Mask>,
     values: J::Value,
@@ -28,6 +29,55 @@ impl<J: Join> JoinIter<J> {
         }
     }
 
+    /// Allows getting joined values for specific entity.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use async_ecs::*;
+    /// # #[derive(Debug, PartialEq)]
+    /// # struct Pos; impl Component for Pos { type Storage = VecStorage<Self>; }
+    /// # #[derive(Debug, PartialEq)]
+    /// # struct Vel; impl Component for Vel { type Storage = VecStorage<Self>; }
+    /// let mut world = World::default();
+    ///
+    /// world.register_component::<Pos>();
+    /// world.register_component::<Vel>();
+    ///
+    /// // This entity could be stashed anywhere (into `Component`, `Resource`, `System`s data, etc.) as it's just a number.
+    /// let entity = world
+    ///     .create_entity()
+    ///     .with(Pos)
+    ///     .with(Vel)
+    ///     .build();
+    ///
+    /// // Later
+    /// {
+    ///     let mut pos = world.component_mut::<Pos>();
+    ///     let vel = world.component::<Vel>();
+    ///
+    ///     assert_eq!(
+    ///         Some((&mut Pos, &Vel)),
+    ///         (&mut pos, &vel).join().get(entity, &world.entities()),
+    ///         "The entity that was stashed still has the needed components and is alive."
+    ///     );
+    /// }
+    ///
+    /// // The entity has found nice spot and doesn't need to move anymore.
+    /// world.component_mut::<Vel>().remove(entity);
+    ///
+    /// // Even later
+    /// {
+    ///     let mut pos = world.component_mut::<Pos>();
+    ///     let vel = world.component::<Vel>();
+    ///
+    ///     assert_eq!(
+    ///         None,
+    ///         (&mut pos, &vel).join().get(entity, &world.entities()),
+    ///         "The entity doesn't have velocity anymore."
+    ///     );
+    /// }
+    /// ```
     pub fn get(&mut self, entity: Entity, entities: &Entities) -> Option<J::Type> {
         if self.keys.contains(entity.index()) && entities.is_alive(entity) {
             Some(J::get(&mut self.values, entity.index()))

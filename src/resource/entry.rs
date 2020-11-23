@@ -11,10 +11,27 @@ pub struct Entry<'a, T: 'a> {
 
 pub type Inner<'a> = HbEntry<'a, ResourceId, Cell<Box<dyn Resource>>, DefaultHashBuilder>;
 
+/// An entry to a resource container.
+/// This is similar to the Entry API found in the standard library.
+///
+/// ## Examples
+///
+/// ```
+/// use async_ecs::World;
+///
+/// #[derive(Debug)]
+/// struct Res(i32);
+///
+/// let mut world = World::default();
+///
+/// let value = world.entry().or_insert(Res(4));
+/// println!("{:?}", value.0 * 2);
+/// ```
 impl<'a, T> Entry<'a, T>
 where
     T: Resource + 'a,
 {
+    /// Create new entry.
     pub fn new(inner: Inner<'a>) -> Self {
         Self {
             inner,
@@ -22,10 +39,16 @@ where
         }
     }
 
+    /// Returns this entry's value, inserts and returns `v` otherwise.
+    ///
+    /// Please note that you should use `or_insert_with` in case the creation of
+    /// the value is expensive.
     pub fn or_insert(self, v: T) -> RefMut<'a, T> {
         self.or_insert_with(move || v)
     }
 
+    /// Returns this entry's value, inserts and returns the return value of `f`
+    /// otherwise.
     pub fn or_insert_with<F>(self, f: F) -> RefMut<'a, T>
     where
         F: FnOnce() -> T,

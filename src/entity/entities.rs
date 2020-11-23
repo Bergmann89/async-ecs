@@ -1,7 +1,19 @@
 use hibitset::BitSet;
 
-use super::Entity;
+use crate::join::{Join, ParJoin};
 
+use super::{Entity, Index};
+
+/// The entities of this ECS. This is a resource, stored in the `World`.
+/// If you just want to access it in your system, you can also use
+/// `Read<Entities>`.
+///
+/// **Please note that you should never get
+/// this mutably in a system, because it would
+/// block all the other systems.**
+///
+/// You need to call `World::maintain` after creating / deleting
+/// entities with this struct.
 #[derive(Default)]
 pub struct Entities {
     alive: BitSet,
@@ -10,6 +22,7 @@ pub struct Entities {
 }
 
 impl Entities {
+    /// Returns `true` if the specified entity is alive.
     pub fn is_alive(&self, entity: Entity) -> bool {
         let i = entity.index();
         let g = entity.generation();
@@ -51,3 +64,25 @@ impl Entities {
         }
     }
 }
+
+impl<'a> Join for &'a Entities {
+    type Mask = &'a BitSet;
+    type Type = Entity;
+    type Value = Self;
+
+    fn open(self) -> (Self::Mask, Self) {
+        (&self.alive, self)
+    }
+
+    fn get(v: &mut &'a Entities, index: Index) -> Entity {
+        let generation = v
+            .generations
+            .get(index as usize)
+            .copied()
+            .unwrap_or_default();
+
+        Entity::from_parts(index, generation)
+    }
+}
+
+impl<'a> ParJoin for &'a Entities {}

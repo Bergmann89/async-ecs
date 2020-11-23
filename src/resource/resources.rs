@@ -40,9 +40,19 @@ macro_rules! fetch_panic {
     }};
 }
 
-/* Resources */
-
+/// A [Resource] container, which provides methods to insert, access and manage
+/// the contained resources.
+///
+/// Many methods take `&self` which works because everything
+/// is stored with **interior mutability**. In case you violate
+/// the borrowing rules of Rust (multiple reads xor one write),
+/// you will get a panic.
+///
+/// # Resource Ids
+///
+/// Resources are identified by `ResourceId`s, which consist of a `TypeId`.
 impl Resources {
+    /// Returns an entry for the resource with type `R`.
     pub fn entry<R>(&mut self) -> Entry<R>
     where
         R: Resource,
@@ -50,6 +60,28 @@ impl Resources {
         Entry::new(self.resources.entry(ResourceId::new::<R>()))
     }
 
+    /// Inserts a resource into this container. If the resource existed before,
+    /// it will be overwritten.
+    ///
+    /// # Examples
+    ///
+    /// Every type satisfying `Any + Send + Sync` automatically
+    /// implements `Resource`, thus can be added:
+    ///
+    /// ```rust
+    /// # #![allow(dead_code)]
+    /// struct MyRes(i32);
+    /// ```
+    ///
+    /// When you have a resource, simply insert it like this:
+    ///
+    /// ```rust
+    /// # struct MyRes(i32);
+    /// use async_ecs::World;
+    ///
+    /// let mut world = World::default();
+    /// world.insert(MyRes(5));
+    /// ```
     pub fn insert<R>(&mut self, r: R)
     where
         R: Resource,
@@ -58,6 +90,14 @@ impl Resources {
             .insert(ResourceId::new::<R>(), Cell::new(Box::new(r)));
     }
 
+    /// Removes a resource of type `R` from this container and returns its
+    /// ownership to the caller. In case there is no such resource in this,
+    /// container, `None` will be returned.
+    ///
+    /// Use this method with caution; other functions and systems might assume
+    /// this resource still exists. Thus, only use this if you're sure no
+    /// system will try to access this resource after you removed it (or else
+    /// you will get a panic).
     pub fn remove<R>(&mut self) -> Option<R>
     where
         R: Resource,
@@ -70,6 +110,7 @@ impl Resources {
             .map(|x| *x)
     }
 
+    /// Returns true if the specified resource type `R` exists in `self`.
     pub fn contains<R>(&self) -> bool
     where
         R: Resource,
@@ -77,6 +118,13 @@ impl Resources {
         self.resources.contains_key(&ResourceId::new::<R>())
     }
 
+    /// Fetches the resource with the specified type `T` or panics if it doesn't
+    /// exist.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the resource doesn't exist.
+    /// Panics if the resource is being accessed mutably.
     pub fn borrow<R>(&self) -> Ref<R>
     where
         R: Resource,
@@ -84,6 +132,8 @@ impl Resources {
         self.try_borrow().unwrap_or_else(|| fetch_panic!())
     }
 
+    /// Like `fetch`, but returns an `Option` instead of inserting a default
+    /// value in case the resource does not exist.
     pub fn try_borrow<R>(&self) -> Option<Ref<R>>
     where
         R: Resource,
@@ -94,6 +144,14 @@ impl Resources {
         })
     }
 
+    /// Fetches the resource with the specified type `T` mutably.
+    ///
+    /// Please see `fetch` for details.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the resource doesn't exist.
+    /// Panics if the resource is already being accessed.
     pub fn borrow_mut<R>(&self) -> RefMut<R>
     where
         R: Resource,
@@ -101,6 +159,8 @@ impl Resources {
         self.try_borrow_mut().unwrap_or_else(|| fetch_panic!())
     }
 
+    /// Like `fetch_mut`, but returns an `Option` instead of inserting a default
+    /// value in case the resource does not exist.
     pub fn try_borrow_mut<R>(&self) -> Option<RefMut<R>>
     where
         R: Resource,
@@ -111,11 +171,15 @@ impl Resources {
         })
     }
 
+    /// Retrieves a resource without fetching, which is cheaper, but only
+    /// available with `&mut self`.
     pub fn get_mut<R: Resource>(&mut self) -> Option<&mut R> {
         self.get_resource_mut(ResourceId::new::<R>())
             .map(|res| res.downcast_mut().unwrap())
     }
 
+    /// Retrieves a resource without fetching, which is cheaper, but only
+    /// available with `&mut self`.
     pub fn get_resource_mut(&mut self, id: ResourceId) -> Option<&mut dyn Resource> {
         self.resources
             .get_mut(&id)

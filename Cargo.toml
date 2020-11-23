@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 asparit = "0.1"
+async-ecs-derive = { version = "0.1", optional = true }
 futures = "0.3"
 hashbrown = "0.9"
 hibitset = { version = "0.6", default-features = false }
@@ -13,3 +14,7 @@ log = "0.4"
 mopa = "0.2"
 thiserror = "1.0"
 tokio = { version = "0.3", features = [ "full", "net", "time", "rt-multi-thread" ] }
+
+[features]
+default = [ "derive" ]
+derive = [ "async-ecs-derive" ]

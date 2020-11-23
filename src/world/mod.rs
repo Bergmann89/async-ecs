@@ -1,6 +1,6 @@
 mod setup;
 
-pub use setup::{DefaultSetupHandler, SetupHandler};
+pub use setup::{DefaultSetupHandler, PanicHandler, SetupHandler};
 
 use std::ops::{Deref, DerefMut};
 
