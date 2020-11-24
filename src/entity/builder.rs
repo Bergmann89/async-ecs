@@ -117,7 +117,7 @@ impl<'a> Builder<'a> {
 impl Drop for Builder<'_> {
     fn drop(&mut self) {
         if !self.built {
-            self.world.entities_mut().kill(self.entity);
+            self.world.entities_mut().delete(self.entity).unwrap();
         }
     }
 }
