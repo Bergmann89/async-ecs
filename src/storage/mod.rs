@@ -1,4 +1,5 @@
 mod anti_storage;
+mod btree_storage;
 mod dense_vec_storage;
 mod drain;
 mod hash_map_storage;
@@ -7,6 +8,7 @@ mod storage_wrapper;
 mod vec_storage;
 
 pub use anti_storage::AntiStorage;
+pub use btree_storage::BTreeStorage;
 pub use dense_vec_storage::DenseVecStorage;
 pub use drain::Drain;
 pub use hash_map_storage::HashMapStorage;
