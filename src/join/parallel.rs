@@ -33,7 +33,7 @@ where
         D: Send + 'a,
         R: Reducer<D> + Send + 'a,
     {
-        let (keys, values) = self.0.open();
+        let (keys, values) = unsafe { self.0.open() };
 
         let keys = BitIter::new(keys);
 
@@ -120,7 +120,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let index = self.keys.next()?;
-        let value = J::get(&mut self.values, index);
+        let value = unsafe { J::get(&mut self.values, index) };
 
         Some(value)
     }

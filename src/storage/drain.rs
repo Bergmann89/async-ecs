@@ -19,13 +19,13 @@ where
     type Type = T;
     type Value = &'a mut MaskedStorage<T>;
 
-    fn open(self) -> (Self::Mask, Self::Value) {
+    unsafe fn open(self) -> (Self::Mask, Self::Value) {
         let mask = self.data.mask().clone();
 
         (mask, self.data)
     }
 
-    fn get(value: &mut Self::Value, id: Index) -> T {
+    unsafe fn get(value: &mut Self::Value, id: Index) -> T {
         value.remove(id).expect("Tried to access same index twice")
     }
 }

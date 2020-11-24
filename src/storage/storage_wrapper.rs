@@ -51,7 +51,7 @@ where
         let index = e.index();
 
         if self.data.mask().contains(index) && self.entities.is_alive(e) {
-            Some(self.data.storage().get(index))
+            Some(unsafe { self.data.storage().get(index) })
         } else {
             None
         }
@@ -98,7 +98,7 @@ where
         let index = e.index();
 
         if self.data.mask().contains(index) && self.entities.is_alive(e) {
-            Some(self.data.storage_mut().get_mut(index))
+            Some(unsafe { self.data.storage_mut().get_mut(index) })
         } else {
             None
         }
@@ -168,11 +168,11 @@ where
     type Type = &'a T;
     type Value = &'a T::Storage;
 
-    fn open(self) -> (Self::Mask, Self::Value) {
+    unsafe fn open(self) -> (Self::Mask, Self::Value) {
         (self.data.mask(), self.data.storage())
     }
 
-    fn get(v: &mut Self::Value, i: Index) -> &'a T {
+    unsafe fn get(v: &mut Self::Value, i: Index) -> &'a T {
         (**v).get(i)
     }
 }
@@ -186,16 +186,14 @@ where
     type Type = &'a mut T;
     type Value = &'a T::Storage;
 
-    fn open(self) -> (Self::Mask, Self::Value) {
+    unsafe fn open(self) -> (Self::Mask, Self::Value) {
         (self.data.mask(), self.data.storage())
     }
 
-    fn get(v: &mut Self::Value, i: Index) -> &'a mut T {
-        unsafe {
-            let value: *mut T::Storage = *v as *const T::Storage as *mut T::Storage;
+    unsafe fn get(v: &mut Self::Value, i: Index) -> &'a mut T {
+        let value: *mut T::Storage = *v as *const T::Storage as *mut T::Storage;
 
-            (*value).get_mut(i)
-        }
+        (*value).get_mut(i)
     }
 }
 

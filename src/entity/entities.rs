@@ -70,11 +70,11 @@ impl<'a> Join for &'a Entities {
     type Type = Entity;
     type Value = Self;
 
-    fn open(self) -> (Self::Mask, Self) {
+    unsafe fn open(self) -> (Self::Mask, Self) {
         (&self.alive, self)
     }
 
-    fn get(v: &mut &'a Entities, index: Index) -> Entity {
+    unsafe fn get(v: &mut &'a Entities, index: Index) -> Entity {
         let generation = v
             .generations
             .get(index as usize)

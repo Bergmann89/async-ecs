@@ -20,7 +20,7 @@ macro_rules! define_tuple_join {
             type Mask = <($($from::Mask,)*) as BitAnd>::Value;
 
             #[allow(non_snake_case)]
-            fn open(self) -> (Self::Mask, Self::Value) {
+            unsafe fn open(self) -> (Self::Mask, Self::Value) {
                 let ($($from,)*) = self;
                 let ($($from,)*) = ($($from.open(),)*);
 
@@ -31,7 +31,7 @@ macro_rules! define_tuple_join {
             }
 
             #[allow(non_snake_case)]
-            fn get(v: &mut Self::Value, i: Index) -> Self::Type {
+            unsafe fn get(v: &mut Self::Value, i: Index) -> Self::Type {
                 let ($(ref mut $from,)*) = v;
 
                 ($($from::get($from, i),)*)
@@ -82,11 +82,11 @@ macro_rules! define_mutable_join {
             type Value = <&'a mut T as Join>::Value;
             type Mask = <&'a mut T as Join>::Mask;
 
-            fn open(self) -> (Self::Mask, Self::Value) {
+            unsafe fn open(self) -> (Self::Mask, Self::Value) {
                 self.deref_mut().open()
             }
 
-            fn get(v: &mut Self::Value, i: Index) -> Self::Type {
+            unsafe fn get(v: &mut Self::Value, i: Index) -> Self::Type {
                 <&'a mut T as Join>::get(v, i)
             }
 
@@ -119,11 +119,11 @@ macro_rules! define_immutable_join {
             type Value = <&'a T as Join>::Value;
             type Mask = <&'a T as Join>::Mask;
 
-            fn open(self) -> (Self::Mask, Self::Value) {
+            unsafe fn open(self) -> (Self::Mask, Self::Value) {
                 self.deref().open()
             }
 
-            fn get(v: &mut Self::Value, i: Index) -> Self::Type {
+            unsafe fn get(v: &mut Self::Value, i: Index) -> Self::Type {
                 <&'a T as Join>::get(v, i)
             }
 

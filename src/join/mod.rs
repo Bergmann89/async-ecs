@@ -174,7 +174,7 @@ pub trait Join {
     /// the `Value` to be mutated independently of the `Mask`.
     /// If the `Mask` does not correctly report the status of the `Value`
     /// then illegal memory access can occur.
-    fn open(self) -> (Self::Mask, Self::Value);
+    unsafe fn open(self) -> (Self::Mask, Self::Value);
 
     /// Get a joined component value by a given index.
     ///
@@ -184,7 +184,7 @@ pub trait Join {
     ///   `Self::Mask`
     /// * The implementation of this method may use unsafe code, but has no
     ///   invariants to meet
-    fn get(value: &mut Self::Value, index: Index) -> Self::Type;
+    unsafe fn get(value: &mut Self::Value, index: Index) -> Self::Type;
 
     /// If this `Join` typically returns all indices in the mask, then iterating
     /// over only it or combined with other joins that are also dangerous

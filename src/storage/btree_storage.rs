@@ -15,23 +15,23 @@ impl<T> Default for BTreeStorage<T> {
 }
 
 impl<T> Storage<T> for BTreeStorage<T> {
-    fn get(&self, index: Index) -> &T {
+    unsafe fn get(&self, index: Index) -> &T {
         &self.0[&index]
     }
 
-    fn get_mut(&mut self, index: Index) -> &mut T {
+    unsafe fn get_mut(&mut self, index: Index) -> &mut T {
         self.0.get_mut(&index).unwrap()
     }
 
-    fn insert(&mut self, index: Index, value: T) {
+    unsafe fn insert(&mut self, index: Index, value: T) {
         self.0.insert(index, value);
     }
 
-    fn remove(&mut self, index: Index) -> T {
+    unsafe fn remove(&mut self, index: Index) -> T {
         self.0.remove(&index).unwrap()
     }
 
-    fn clean<B>(&mut self, _has: B)
+    unsafe fn clean<B>(&mut self, _has: B)
     where
         B: BitSetLike,
     {

@@ -18,23 +18,23 @@ impl<T> Default for HashMapStorage<T> {
 }
 
 impl<T> Storage<T> for HashMapStorage<T> {
-    fn get(&self, id: Index) -> &T {
+    unsafe fn get(&self, id: Index) -> &T {
         &self.0[&id]
     }
 
-    fn get_mut(&mut self, id: Index) -> &mut T {
+    unsafe fn get_mut(&mut self, id: Index) -> &mut T {
         self.0.get_mut(&id).unwrap()
     }
 
-    fn insert(&mut self, id: Index, v: T) {
+    unsafe fn insert(&mut self, id: Index, v: T) {
         self.0.insert(id, v);
     }
 
-    fn remove(&mut self, index: Index) -> T {
+    unsafe fn remove(&mut self, index: Index) -> T {
         self.0.remove(&index).unwrap()
     }
 
-    fn clean<B>(&mut self, _has: B)
+    unsafe fn clean<B>(&mut self, _has: B)
     where
         B: BitSetLike,
     {

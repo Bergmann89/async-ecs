@@ -18,11 +18,11 @@ impl<'a> Join for AntiStorage<'a> {
     type Type = ();
     type Value = ();
 
-    fn open(self) -> (Self::Mask, ()) {
+    unsafe fn open(self) -> (Self::Mask, ()) {
         (BitSetNot(self.0), ())
     }
 
-    fn get(_: &mut Self::Value, _: Index) {}
+    unsafe fn get(_: &mut Self::Value, _: Index) {}
 }
 
 impl<'a> ParJoin for AntiStorage<'a> {}

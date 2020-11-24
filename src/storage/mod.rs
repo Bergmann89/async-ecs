@@ -33,7 +33,7 @@ pub trait Storage<T>: TryDefault {
     ///
     /// A mask should keep track of those states, and an `id` being contained
     /// in the tracking mask is sufficient to call this method.
-    fn get(&self, index: Index) -> &T;
+    unsafe fn get(&self, index: Index) -> &T;
 
     /// Tries mutating the data associated with an `Index`.
     /// This is unsafe because the external set used
@@ -46,7 +46,7 @@ pub trait Storage<T>: TryDefault {
     ///
     /// A mask should keep track of those states, and an `id` being contained
     /// in the tracking mask is sufficient to call this method.
-    fn get_mut(&mut self, index: Index) -> &mut T;
+    unsafe fn get_mut(&mut self, index: Index) -> &mut T;
 
     /// Inserts new data for a given `Index`.
     ///
@@ -57,7 +57,7 @@ pub trait Storage<T>: TryDefault {
     ///
     /// A mask should keep track of those states, and an `id` missing from the
     /// mask is sufficient to call `insert`.
-    fn insert(&mut self, index: Index, value: T);
+    unsafe fn insert(&mut self, index: Index, value: T);
 
     /// Removes the data associated with an `Index`.
     ///
@@ -65,7 +65,7 @@ pub trait Storage<T>: TryDefault {
     ///
     /// May only be called if an element with `id` was `insert`ed and not yet
     /// removed / dropped.
-    fn remove(&mut self, index: Index) -> T;
+    unsafe fn remove(&mut self, index: Index) -> T;
 
     /// Clean the storage given a bitset with bits set for valid indices.
     /// Allows us to safely drop the storage.
@@ -74,7 +74,7 @@ pub trait Storage<T>: TryDefault {
     ///
     /// May only be called with the mask which keeps track of the elements
     /// existing in this storage.
-    fn clean<B>(&mut self, has: B)
+    unsafe fn clean<B>(&mut self, has: B)
     where
         B: BitSetLike;
 
@@ -87,7 +87,7 @@ pub trait Storage<T>: TryDefault {
     ///
     /// May only be called if an element with `id` was `insert`ed and not yet
     /// removed / dropped.
-    fn drop(&mut self, index: Index) {
+    unsafe fn drop(&mut self, index: Index) {
         self.remove(index);
     }
 }

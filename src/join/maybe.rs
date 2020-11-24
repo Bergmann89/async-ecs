@@ -25,13 +25,13 @@ where
     type Type = Option<<T as Join>::Type>;
     type Value = (<T as Join>::Mask, <T as Join>::Value);
 
-    fn open(self) -> (Self::Mask, Self::Value) {
+    unsafe fn open(self) -> (Self::Mask, Self::Value) {
         let (mask, value) = self.0.open();
 
         (BitSetAll, (mask, value))
     }
 
-    fn get((mask, value): &mut Self::Value, index: Index) -> Self::Type {
+    unsafe fn get((mask, value): &mut Self::Value, index: Index) -> Self::Type {
         if mask.contains(index) {
             Some(<T as Join>::get(value, index))
         } else {

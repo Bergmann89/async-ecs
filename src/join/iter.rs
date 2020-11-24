@@ -21,7 +21,7 @@ impl<J: Join> JoinIter<J> {
             );
         }
 
-        let (keys, values) = j.open();
+        let (keys, values) = unsafe { j.open() };
 
         JoinIter {
             keys: keys.iter(),
@@ -80,7 +80,7 @@ impl<J: Join> JoinIter<J> {
     /// ```
     pub fn get(&mut self, entity: Entity, entities: &Entities) -> Option<J::Type> {
         if self.keys.contains(entity.index()) && entities.is_alive(entity) {
-            Some(J::get(&mut self.values, entity.index()))
+            Some(unsafe { J::get(&mut self.values, entity.index()) })
         } else {
             None
         }
@@ -91,7 +91,9 @@ impl<J: Join> Iterator for JoinIter<J> {
     type Item = J::Type;
 
     fn next(&mut self) -> Option<J::Type> {
-        self.keys.next().map(|idx| J::get(&mut self.values, idx))
+        self.keys
+            .next()
+            .map(|idx| unsafe { J::get(&mut self.values, idx) })
     }
 }
 

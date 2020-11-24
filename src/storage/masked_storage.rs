@@ -44,12 +44,13 @@ impl<T: Component> MaskedStorage<T> {
         let index = entity.index();
 
         if self.mask.contains(index) {
-            swap(&mut component, self.inner.get_mut(index));
+            swap(&mut component, unsafe { self.inner.get_mut(index) });
 
             Some(component)
         } else {
             self.mask.add(index);
-            self.inner.insert(index, component);
+
+            unsafe { self.inner.insert(index, component) };
 
             None
         }
@@ -57,7 +58,7 @@ impl<T: Component> MaskedStorage<T> {
 
     /// Clear the contents of this storage.
     pub fn clear(&mut self) {
-        self.inner.clean(&self.mask);
+        unsafe { self.inner.clean(&self.mask) };
 
         self.mask.clear();
     }
@@ -65,7 +66,7 @@ impl<T: Component> MaskedStorage<T> {
     /// Remove an element by a given index.
     pub fn remove(&mut self, index: Index) -> Option<T> {
         if self.mask.remove(index) {
-            Some(self.inner.remove(index))
+            Some(unsafe { self.inner.remove(index) })
         } else {
             None
         }
@@ -74,7 +75,7 @@ impl<T: Component> MaskedStorage<T> {
     /// Drop an element by a given index.
     pub fn drop(&mut self, index: Index) {
         if self.mask.remove(index) {
-            self.inner.drop(index);
+            unsafe { self.inner.drop(index) };
         }
     }
 }

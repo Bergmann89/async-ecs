@@ -35,55 +35,47 @@ impl<T> Default for DenseVecStorage<T> {
 }
 
 impl<T> Storage<T> for DenseVecStorage<T> {
-    fn get(&self, index: Index) -> &T {
-        unsafe {
-            let index = self.data_id.get_unchecked(index as usize).assume_init();
+    unsafe fn get(&self, index: Index) -> &T {
+        let index = self.data_id.get_unchecked(index as usize).assume_init();
 
-            self.data.get_unchecked(index as usize)
-        }
+        self.data.get_unchecked(index as usize)
     }
 
-    fn get_mut(&mut self, index: Index) -> &mut T {
-        unsafe {
-            let index = self.data_id.get_unchecked(index as usize).assume_init();
+    unsafe fn get_mut(&mut self, index: Index) -> &mut T {
+        let index = self.data_id.get_unchecked(index as usize).assume_init();
 
-            self.data.get_unchecked_mut(index as usize)
-        }
+        self.data.get_unchecked_mut(index as usize)
     }
 
-    fn insert(&mut self, index: Index, v: T) {
-        unsafe {
-            let index = index as usize;
+    unsafe fn insert(&mut self, index: Index, v: T) {
+        let index = index as usize;
 
-            if self.data_id.len() <= index {
-                let delta = index + 1 - self.data_id.len();
-                self.data_id.reserve(delta);
-                self.data_id.set_len(index + 1);
-            }
-
-            self.data_id
-                .get_unchecked_mut(index)
-                .as_mut_ptr()
-                .write(self.data.len() as Index);
-            self.entity_id.push(index as Index);
-            self.data.push(v);
+        if self.data_id.len() <= index {
+            let delta = index + 1 - self.data_id.len();
+            self.data_id.reserve(delta);
+            self.data_id.set_len(index + 1);
         }
+
+        self.data_id
+            .get_unchecked_mut(index)
+            .as_mut_ptr()
+            .write(self.data.len() as Index);
+        self.entity_id.push(index as Index);
+        self.data.push(v);
     }
 
-    fn remove(&mut self, index: Index) -> T {
-        unsafe {
-            let index = self.data_id.get_unchecked(index as usize).assume_init();
-            let last = *self.entity_id.last().unwrap();
-            self.data_id
-                .get_unchecked_mut(last as usize)
-                .as_mut_ptr()
-                .write(index);
-            self.entity_id.swap_remove(index as usize);
-            self.data.swap_remove(index as usize)
-        }
+    unsafe fn remove(&mut self, index: Index) -> T {
+        let index = self.data_id.get_unchecked(index as usize).assume_init();
+        let last = *self.entity_id.last().unwrap();
+        self.data_id
+            .get_unchecked_mut(last as usize)
+            .as_mut_ptr()
+            .write(index);
+        self.entity_id.swap_remove(index as usize);
+        self.data.swap_remove(index as usize)
     }
 
-    fn clean<B>(&mut self, _has: B)
+    unsafe fn clean<B>(&mut self, _has: B)
     where
         B: BitSetLike,
     {
