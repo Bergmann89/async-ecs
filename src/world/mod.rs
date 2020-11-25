@@ -1,5 +1,7 @@
+mod lazy;
 mod setup;
 
+pub use lazy::Lazy;
 pub use setup::{DefaultSetupHandler, PanicHandler, SetupHandler};
 
 use std::ops::{Deref, DerefMut};
@@ -7,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 use crate::{
     access::{Read, ReadStorage, WriteStorage},
     component::Component,
-    entity::{Builder, Entities},
+    entity::{Entities, Entity, EntityBuilder},
     resource::{Ref, RefMut, Resource, Resources},
     storage::MaskedStorage,
     system::SystemData,
@@ -52,6 +54,10 @@ impl World {
         self.resource_mut()
     }
 
+    pub fn lazy(&self) -> Read<Lazy> {
+        Read::fetch(&self)
+    }
+
     pub fn component<T: Component>(&self) -> ReadStorage<T> {
         ReadStorage::fetch(&self)
     }
@@ -60,8 +66,12 @@ impl World {
         WriteStorage::fetch(&self)
     }
 
-    pub fn create_entity(&mut self) -> Builder {
-        Builder::new(self)
+    pub fn create_entity(&mut self) -> EntityBuilder {
+        EntityBuilder::new(self)
+    }
+
+    pub fn is_alive(&self, entity: Entity) -> bool {
+        self.entities().is_alive(entity)
     }
 }
 
@@ -70,6 +80,7 @@ impl Default for World {
         let mut resources = Resources::default();
 
         resources.insert(Entities::default());
+        resources.insert(Lazy::default());
 
         Self(resources)
     }

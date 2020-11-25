@@ -2,6 +2,25 @@ use crate::{access::WriteStorage, component::Component, system::SystemData, worl
 
 use super::Entity;
 
+/// A common trait for `EntityBuilder` and `LazyBuilder`, allowing either to be
+/// used. Entity is definitely alive, but the components may or may not exist
+/// before a call to `World::maintain`.
+pub trait Builder {
+    /// Appends a component and associates it with the entity.
+    ///
+    /// If a component was already associated with the entity, it should
+    /// overwrite the previous component.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the component hasn't been `register()`ed in the
+    /// `World`.
+    fn with<C: Component + Send + Sync>(self, component: C) -> Self;
+
+    /// Finishes the building and returns the entity.
+    fn build(self) -> Entity;
+}
+
 /// The entity builder, allowing to
 /// build an entity together with its components.
 ///
@@ -71,13 +90,13 @@ use super::Entity;
 ///
 /// let entity = entitybuilder.build();
 /// ```
-pub struct Builder<'a> {
+pub struct EntityBuilder<'a> {
     world: &'a World,
     entity: Entity,
     built: bool,
 }
 
-impl<'a> Builder<'a> {
+impl<'a> EntityBuilder<'a> {
     /// Create new entity builder.
     pub fn new(world: &'a World) -> Self {
         let entity = world.entities_mut().allocate();
@@ -88,13 +107,15 @@ impl<'a> Builder<'a> {
             built: false,
         }
     }
+}
 
+impl<'a> Builder for EntityBuilder<'a> {
     /// Inserts a component for this entity.
     ///
     /// If a component was already associated with the entity, it will
     /// overwrite the previous component.
     #[inline]
-    pub fn with<T: Component>(self, c: T) -> Self {
+    fn with<T: Component>(self, c: T) -> Self {
         {
             let mut storage = WriteStorage::<T>::fetch(&self.world);
 
@@ -107,14 +128,14 @@ impl<'a> Builder<'a> {
     /// Finishes the building and returns the entity. As opposed to
     /// `LazyBuilder`, the components are available immediately.
     #[inline]
-    pub fn build(mut self) -> Entity {
+    fn build(mut self) -> Entity {
         self.built = true;
 
         self.entity
     }
 }
 
-impl Drop for Builder<'_> {
+impl Drop for EntityBuilder<'_> {
     fn drop(&mut self) {
         if !self.built {
             self.world.entities_mut().delete(self.entity).unwrap();

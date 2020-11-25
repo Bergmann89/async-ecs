@@ -17,11 +17,12 @@ pub use asparit;
 pub use access::{Read, ReadStorage, Write, WriteStorage};
 pub use component::Component;
 pub use dispatcher::Dispatcher;
+pub use entity::Builder;
 pub use join::{Join, ParJoin};
 pub use resource::{ResourceId, Resources};
 pub use storage::{DenseVecStorage, HashMapStorage, VecStorage};
 pub use system::{AsyncSystem, System};
-pub use world::World;
+pub use world::{Lazy, World};
 
 pub type Entities<'a> = Read<'a, entity::Entities>;
 

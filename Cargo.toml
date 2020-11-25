@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 asparit = "0.1"
 async-ecs-derive = { version = "0.1", optional = true }
+crossbeam-queue = "0.3"
 futures = "0.3"
 hashbrown = "0.9"
 hibitset = { version = "0.6", default-features = false }
