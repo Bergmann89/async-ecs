@@ -83,6 +83,23 @@ impl World {
     pub fn is_alive(&self, entity: Entity) -> bool {
         self.entities().is_alive(entity)
     }
+
+    pub async fn maintain(&mut self) {
+        let lazy = self.resource_mut::<Lazy>().clone();
+        lazy.maintain(self).await;
+
+        let deleted = self.entities_mut().maintain();
+        if !deleted.is_empty() {
+            self.entry::<MetaTable<dyn AnyStorage>>()
+                .or_insert_with(Default::default);
+            for storage in self
+                .resource_mut::<MetaTable<dyn AnyStorage>>()
+                .iter_mut(&self)
+            {
+                storage.drop(&deleted);
+            }
+        }
+    }
 }
 
 impl Default for World {

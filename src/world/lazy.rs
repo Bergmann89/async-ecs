@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crossbeam_queue::SegQueue;
 use futures::future::BoxFuture;
 use log::warn;
@@ -21,7 +23,7 @@ use super::World;
 /// Please note that the provided methods take `&self` so there's no need to get
 /// `Lazy` mutably. This resource is added to the world by default.
 pub struct Lazy {
-    queue: SegQueue<LazyUpdate>,
+    queue: Arc<SegQueue<LazyUpdate>>,
 }
 
 impl Lazy {
@@ -262,7 +264,15 @@ impl Lazy {
 impl Default for Lazy {
     fn default() -> Self {
         Self {
-            queue: SegQueue::new(),
+            queue: Arc::new(SegQueue::new()),
+        }
+    }
+}
+
+impl Clone for Lazy {
+    fn clone(&self) -> Self {
+        Self {
+            queue: self.queue.clone(),
         }
     }
 }
