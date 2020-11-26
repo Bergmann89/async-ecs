@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use hashbrown::HashMap;
 use hibitset::BitSetLike;
 
 use crate::entity::Index;

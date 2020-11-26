@@ -1,6 +1,6 @@
-use std::collections::hash_map::{Entry, HashMap};
 use std::fmt::Debug;
 
+use hashbrown::hash_map::{Entry, HashMap};
 use tokio::{
     sync::watch::channel,
     task::{spawn as spawn_task, spawn_local},

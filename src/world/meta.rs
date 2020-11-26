@@ -1,7 +1,7 @@
 use std::any::TypeId;
-use std::collections::hash_map::{Entry, HashMap};
 use std::marker::PhantomData;
 
+use hashbrown::hash_map::{Entry, HashMap};
 use mopa::Any;
 
 use crate::resource::{Resource, ResourceId};
