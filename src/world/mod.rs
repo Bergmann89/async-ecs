@@ -1,6 +1,8 @@
 mod lazy;
+mod meta;
 mod setup;
 
+pub use self::meta::{CastFrom, MetaTable};
 pub use lazy::Lazy;
 pub use setup::{DefaultSetupHandler, PanicHandler, SetupHandler};
 
@@ -10,7 +12,7 @@ use crate::{
     access::{Read, ReadStorage, WriteStorage},
     component::Component,
     entity::{Entities, Entity, EntityBuilder},
-    resource::{Ref, RefMut, Resource, Resources},
+    resource::{Cell, Ref, RefMut, Resource, ResourceId, Resources},
     storage::MaskedStorage,
     system::SystemData,
 };
@@ -32,6 +34,10 @@ impl World {
     {
         self.entry()
             .or_insert_with(move || MaskedStorage::<T>::new(storage()));
+        self.entry::<MetaTable<dyn AnyStorage>>()
+            .or_insert_with(Default::default);
+        self.resource_mut::<MetaTable<dyn AnyStorage>>()
+            .register(&*self.resource::<MaskedStorage<T>>());
     }
 
     pub fn register_resource<T: Resource>(&mut self, res: T) {
@@ -44,6 +50,10 @@ impl World {
 
     pub fn resource_mut<T: Resource>(&self) -> RefMut<T> {
         self.0.borrow_mut()
+    }
+
+    pub fn resource_raw(&self, id: &ResourceId) -> Option<&Cell<Box<dyn Resource>>> {
+        self.0.get_raw(id)
     }
 
     pub fn entities(&self) -> Read<Entities> {
@@ -81,6 +91,7 @@ impl Default for World {
 
         resources.insert(Entities::default());
         resources.insert(Lazy::default());
+        resources.insert(MetaTable::<dyn AnyStorage>::default());
 
         Self(resources)
     }
@@ -97,5 +108,35 @@ impl Deref for World {
 impl DerefMut for World {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+/* AnyStorage */
+
+pub trait AnyStorage {
+    fn drop(&mut self, entities: &[Entity]);
+}
+
+unsafe impl<T> CastFrom<T> for dyn AnyStorage
+where
+    T: AnyStorage + 'static,
+{
+    fn cast(t: &T) -> &Self {
+        t
+    }
+
+    fn cast_mut(t: &mut T) -> &mut Self {
+        t
+    }
+}
+
+impl<T> AnyStorage for MaskedStorage<T>
+where
+    T: Component,
+{
+    fn drop(&mut self, entities: &[Entity]) {
+        for entity in entities {
+            MaskedStorage::drop(self, entity.index());
+        }
     }
 }

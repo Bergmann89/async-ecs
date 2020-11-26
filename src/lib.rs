@@ -22,7 +22,7 @@ pub use join::{Join, ParJoin};
 pub use resource::{ResourceId, Resources};
 pub use storage::{DenseVecStorage, HashMapStorage, VecStorage};
 pub use system::{AsyncSystem, System};
-pub use world::{Lazy, World};
+pub use world::{CastFrom, Lazy, MetaTable, World};
 
 pub type Entities<'a> = Read<'a, entity::Entities>;
 

@@ -4,8 +4,10 @@ use std::ops::{Deref, DerefMut};
 use hashbrown::HashMap;
 use mopa::Any;
 
+pub use super::cell::Cell;
+
 use super::{
-    cell::{Cell, Ref as CellRef, RefMut as CellRefMut},
+    cell::{Ref as CellRef, RefMut as CellRefMut},
     entry::Entry,
     Resource, ResourceId,
 };
@@ -185,6 +187,11 @@ impl Resources {
             .get_mut(&id)
             .map(Cell::get_mut)
             .map(Box::as_mut)
+    }
+
+    /// Get raw access to the underlying cell.
+    pub fn get_raw(&self, id: &ResourceId) -> Option<&Cell<Box<dyn Resource>>> {
+        self.resources.get(id)
     }
 }
 
