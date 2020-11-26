@@ -2,7 +2,14 @@
 name = "async-ecs"
 version = "0.1.0"
 authors = ["Bergmann89 <info@bergmann89.de>"]
+description = "Async Parallel Entity Component System for Rust"
 edition = "2018"
+license = "Apache-2.0/MIT"
+repository = "https://github.com/Bergmann89/async-ecs"
+documentation = "https://docs.rs/async-ecs/"
+readme = "README.md"
+keywords = ["gamedev", "ecs", "entity", "component"]
+categories = ["concurrency", "game-engines"]
 
 [dependencies]
 asparit = "0.1"
