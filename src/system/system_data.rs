@@ -135,6 +135,20 @@ where
     }
 }
 
+impl<'a> SystemData<'a> for () {
+    fn setup(_: &mut World) {}
+
+    fn fetch(_: &'a World) -> Self {}
+
+    fn reads() -> Vec<ResourceId> {
+        Vec::new()
+    }
+
+    fn writes() -> Vec<ResourceId> {
+        Vec::new()
+    }
+}
+
 /* DynamicSystemData */
 
 impl<'a, T> DynamicSystemData<'a> for T
