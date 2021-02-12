@@ -119,7 +119,11 @@ impl<T> Cell<T> {
                 return false;
             }
 
-            if self.flag.compare_and_swap(val, val + 1, Ordering::AcqRel) == val {
+            if self
+                .flag
+                .compare_exchange(val, val + 1, Ordering::AcqRel, Ordering::Acquire)
+                == Ok(val)
+            {
                 return true;
             }
         }
@@ -128,7 +132,9 @@ impl<T> Cell<T> {
     /// Make sure we are allowed to aquire a write lock, and then set the write
     /// lock flag.
     fn check_flag_write(&self) -> bool {
-        self.flag.compare_and_swap(0, usize::MAX, Ordering::AcqRel) == 0
+        self.flag
+            .compare_exchange(0, usize::MAX, Ordering::AcqRel, Ordering::Acquire)
+            == Ok(0)
     }
 }
 
