@@ -21,7 +21,10 @@ hibitset = { version = "0.6", default-features = false }
 log = "0.4"
 mopa = "0.2"
 thiserror = "1.0"
-tokio = { version = "1.2", features = [ "full", "net", "time", "rt-multi-thread" ] }
+tokio = { version = "1.2", features = ["sync"] }
+
+[dev-dependencies]
+tokio = { version = "1.2", features = ["macros", "sync", "rt-multi-thread"] }
 
 [features]
 default = [ "derive" ]
